@@ -1,0 +1,62 @@
+---
+sidebar_position: 2
+description: Learn how to create the classic LED blinking program on Raspberry
+    Pi Pico and ESP32 using DeviceScript.
+keywords:
+    - Raspberry Pi Pico
+    - ESP32
+    - LED blinking
+    - DeviceScript
+    - microcontroller programming
+hide_table_of_contents: true
+---
+
+import StaticVideo from "@site/src/components/StaticVideo"
+import WokwiEditor from "@site/src/components/WokwiEditor"
+
+# Blinky
+
+The classic LED blinking program on a [Raspberry Pi Pico](/devices/rp2040). The LED is connected to the Pico's pin GP1 (2 on the silk)
+
+<StaticVideo name="blinky" />
+
+```ts
+import { pins } from "@dsboard/pico"
+import { startLightBulb } from "@devicescript/servers"
+
+// start a lightbulb server on pin GP1
+// and store client in `led` variable
+const led = startLightBulb({
+    pin: pins.GP1,
+})
+
+// start interval timer every 1000ms
+setInterval(async () => {
+    // read current brightness
+    const brightness = await led.intensity.read()
+    // toggle on/off
+    const newbrightness = brightness > 0 ? 0 : 1
+    // apply new brightness
+    await led.intensity.write(newbrightness)
+}, 1000)
+```
+
+## ESP32
+
+The classic LED blinking program on a [ESP32](/devices/esp32)
+is similar. The LED is connected to the pin `A0`.
+
+```ts
+import { pins } from "@dsboard/adafruit_qt_py_c3"
+import { startLightBulb } from "@devicescript/servers"
+
+const lightBulb = startLightBulb({
+    pin: pins.A0_D0,
+})
+
+setInterval(async () => {
+    await lightBulb.toggle()
+}, 500)
+```
+
+<WokwiEditor projectId="368689527293414401" />

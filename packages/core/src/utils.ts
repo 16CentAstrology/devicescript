@@ -7,12 +7,6 @@ Math.sign = function sign(v) {
     return NaN
 }
 
-Math.clamp = function clamp(low, v, hi) {
-    if (v < low) return low
-    if (v > hi) return hi
-    return v
-}
-
 Math.sqrt = function sqrt(x) {
     return Math.pow(x, 0.5)
 }
@@ -32,6 +26,17 @@ Math.log10 = function log10(x) {
 Math.log2 = function log2(x) {
     return Math.log(x) * 1.4426950408889634
 }
+
+Math.map = function map(x, inMin, inMax, outMin, outMax) {
+    const inRange = inMax - inMin
+    const outRange = outMax - outMin
+    return ((x - inMin) / inRange) * outRange + outMin
+}
+Math.constrain = function constrain(x, low, high) {
+    if (x < low) return low
+    else if (x > high) return high
+    else return x
+}
 ;(ds as typeof ds).assert = function assert(cond: boolean, msg?: string): void {
     if (!cond)
         throw new Error("Assertion failed: " + (msg !== undefined ? msg : ""))
@@ -44,7 +49,7 @@ Math.log2 = function log2(x) {
 // TODO timeout
 // TODO retry policy
 ;(ds as typeof ds).actionReport = async function actionResponse<
-    T extends ds.Role
+    T extends ds.Role,
 >(
     role: T,
     meth: string & keyof T,
@@ -61,4 +66,15 @@ Math.log2 = function log2(x) {
     })
     await fn()
     return await ds.suspend<ds.Packet>()
+}
+
+/**
+ * @devsNative GPIO
+ */
+declare var GPIO: any
+;(ds as typeof ds).gpio = (gpio: number) => {
+    for (const p of Object.values(GPIO)) {
+        if ((p as ds.PinBase).gpio === gpio) return p as any
+    }
+    throw new Error(`pin ${gpio} not exposed; available: ${Object.keys(GPIO)}`)
 }

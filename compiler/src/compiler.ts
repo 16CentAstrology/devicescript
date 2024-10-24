@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import { SyntaxKind as SK } from "typescript"
+import { parseToSettings } from "./dotenv"
 
 import {
     stringToUint8Array,
@@ -84,6 +85,7 @@ import {
     ResolvedBuildConfig,
     ProgramConfig,
     PkgJson,
+    JSON5TryParse,
 } from "@devicescript/interop"
 import { BaseServiceConfig } from "@devicescript/srvcfg"
 import { jsonToDcfg, serializeDcfg } from "./dcfg"
@@ -102,6 +104,20 @@ export const DEVS_BYTECODE_FILE = `${DEVS_FILE_PREFIX}.devs`
 export const DEVS_LIB_FILE = `${DEVS_FILE_PREFIX}-lib.json`
 export const DEVS_DBG_FILE = `${DEVS_FILE_PREFIX}-dbg.json`
 export const DEVS_SIZES_FILE = `${DEVS_FILE_PREFIX}-sizes.md`
+
+export const TSDOC_PART = "devsPart"
+export const TSDOC_SERVICES = "devsServices"
+export const TSDOC_START = "devsStart"
+export const TSDOC_WHEN_USED = "devsWhenUsed"
+export const TSDOC_NATIVE = "devsNative"
+
+export const TSDOC_TAGS = [
+    TSDOC_PART,
+    TSDOC_SERVICES,
+    TSDOC_START,
+    TSDOC_WHEN_USED,
+    TSDOC_NATIVE,
+]
 
 const coreModule = "@devicescript/core"
 
@@ -526,7 +542,7 @@ interface PossiblyConstDeclaration extends ts.Declaration {
     __ds_const_val?: Folded
 }
 
-export function getSymTags(sym: ts.Symbol, pref = "ds-") {
+export function getSymTags(sym: ts.Symbol, pref = "devs") {
     const tags: Record<string, string> = {}
     for (const tag of sym?.getJsDocTags() ?? []) {
         if (tag.name.startsWith(pref)) {
@@ -575,7 +591,10 @@ class Program implements TopOpWriter {
     private retValExpr: ts.Expression
     private retValRefs = 0
 
-    constructor(public mainFileName: string, public host: Host) {
+    constructor(
+        public mainFileName: string,
+        public host: Host
+    ) {
         this.flags = host.getFlags?.() ?? {}
         this.isLibrary = this.flags.library || false
         this.serviceSpecs = {}
@@ -804,11 +823,6 @@ class Program implements TopOpWriter {
         }, e as ts.Expression)
     }
 
-    private emitSleep(ms: number) {
-        const wr = this.writer
-        wr.emitCall(wr.dsMember(BuiltInString.SLEEP), literal(ms))
-    }
-
     private withProcedure(proc: Procedure, f: (wr: OpWriter) => void) {
         assert(!!proc)
         const prevProc = this.proc
@@ -884,14 +898,21 @@ class Program implements TopOpWriter {
             return json
         }
 
+        if (ts.isPropertyAccessExpression(node)) {
+            const tags = getSymTags(this.getSymAtLocation(node.expression))
+            if (tags[TSDOC_NATIVE] == "GPIO") {
+                const t2 = getSymTags(this.getSymAtLocation(node))
+                if (t2[TSDOC_NATIVE])
+                    return t2[TSDOC_NATIVE].replace(/^GPIO\./, "")
+                const lbl = this.forceName(node.name)
+                return lbl // pin name
+            }
+        }
+
         if (ts.isCallExpression(node)) {
             const nam = this.nodeName(node.expression)
             if (nam == "#ds.gpio") return this.toLiteralJSON(node.arguments[0])
         }
-
-        const tags = getSymTags(this.getSymAtLocation(node))
-        const gpio = parseInt(tags["ds-gpio"])
-        if (!isNaN(gpio)) return gpio
 
         throwError(node, `expecting JSON literal here`)
     }
@@ -906,7 +927,7 @@ class Program implements TopOpWriter {
         this.startServices.push(cfg)
         if (this.isIgnored(expr)) return unit()
         else {
-            let name = cfg.name || servName(cfg.service) + "__" + off
+            let name = cfg.name || servName(cfg.service) + "_" + off
             name += `[int:${off}]`
             return this.allocRole(spec, this.writer.emitString(name))
         }
@@ -924,7 +945,7 @@ class Program implements TopOpWriter {
         if (!nn) return undefined
 
         const tags = getSymTags(sym)
-        const dsstart = tags["ds-start"]
+        const dsstart = tags[TSDOC_START]
         if (dsstart) {
             let sinfo: BaseServiceConfig
             try {
@@ -940,7 +961,7 @@ class Program implements TopOpWriter {
                     sinfo.name = str
                 }
                 return this.startServer(expr, sinfo)
-            } else throwError(expr, "invalid @ds-start tag")
+            } else throwError(expr, `invalid @${TSDOC_START} tag`)
         }
 
         if (nn.startsWith(startServerPref)) {
@@ -1390,22 +1411,27 @@ class Program implements TopOpWriter {
         return res
     }
 
-    private emitForOfStatement(stmt: ts.ForOfStatement) {
+    private emitForInOrOfStatement(stmt: ts.ForInOrOfStatement) {
         const wr = this.writer
 
         const loop = this.mkLoopLabels(stmt)
 
         if (
-            stmt.awaitModifier ||
+            (stmt as ts.ForOfStatement).awaitModifier ||
             !stmt.initializer ||
             !ts.isVariableDeclarationList(stmt.initializer) ||
             stmt.initializer.declarations.length != 1
         )
-            throwError(stmt, "only for (let/const x of ...) supported")
+            throwError(stmt, "only for (let/const x in/of ...) supported")
 
         const decl = stmt.initializer.declarations[0]
 
-        const coll = wr.cacheValue(this.emitExpr(stmt.expression), true)
+        let collExpr = this.emitExpr(stmt.expression)
+        if (stmt.kind == SK.ForInStatement) {
+            wr.emitCall(wr.objectMember(BuiltInString.KEYS), collExpr)
+            collExpr = this.retVal()
+        }
+        const coll = wr.cacheValue(collExpr, true)
         const idx = wr.cacheValue(literal(0), true)
 
         this.emitVariableDeclarationList(stmt.initializer)
@@ -1641,7 +1667,10 @@ class Program implements TopOpWriter {
     }
 
     private emitFunctionBody(stmt: FunctionLike, proc: Procedure) {
-        if (ts.isBlock(stmt.body)) {
+        if (!stmt.body) {
+            const wr = this.writer
+            wr.emitCall(wr.dsMember(BuiltInString.NOTIMPLEMENTED))
+        } else if (ts.isBlock(stmt.body)) {
             this.emitStmt(stmt.body)
             if (!this.writer.justHadReturn())
                 this.writer.emitStmt(Op.STMT1_RETURN, literal(undefined))
@@ -1815,6 +1844,8 @@ class Program implements TopOpWriter {
     private emitClassDeclaration(stmt: ts.ClassDeclaration) {
         const fdecl = this.getCellAtLocation(stmt) as FunctionDecl
         assert(fdecl instanceof FunctionDecl)
+        const classTags = getSymTags(this.getSymAtLocation(stmt))
+        const whenUsed = classTags[TSDOC_WHEN_USED] !== undefined
 
         let numCtorArgs: number = null
 
@@ -1831,6 +1862,8 @@ class Program implements TopOpWriter {
 
             if (ts.isMethodDeclaration(mem) && mem.body) {
                 const sym = this.getSymAtLocation(mem)
+                const tags = getSymTags(sym)
+                if (tags.hasOwnProperty(TSDOC_NATIVE)) continue
                 const info: ProtoDefinition = {
                     className: this.nodeName(stmt),
                     methodName: this.forceName(mem.name),
@@ -1839,8 +1872,11 @@ class Program implements TopOpWriter {
                 }
                 if (info.methodName == "toString") this.toStringError(mem)
                 this.protoDefinitions.push(info)
-                // TODO make this conditional, see https://github.com/microsoft/devicescript/issues/332
-                this.markMethodUsed(info.names[0])
+                if (whenUsed || tags[TSDOC_WHEN_USED] !== undefined) {
+                    // skip marking as used
+                } else {
+                    this.markMethodUsed(info.names[0])
+                }
             } else if (ts.isConstructorDeclaration(mem)) {
                 numCtorArgs = mem.parameters.length
             } else if (ts.isPropertyDeclaration(mem) && this.isStatic(mem)) {
@@ -1932,6 +1968,8 @@ class Program implements TopOpWriter {
 
         this.withProcedure(this.protoProc, () => {
             for (;;) {
+                if (this.usedSpecs.length > 0)
+                    this.markMethodUsed("#ds.Role._onPacket")
                 let numemit = 0
                 for (const p of this.protoDefinitions) {
                     if (needsEmit(p)) {
@@ -2006,8 +2044,6 @@ class Program implements TopOpWriter {
                 wr.emitCall(wr.dsMember(BuiltInString.RESTART))
             wr.emitStmt(Op.STMT1_RETURN, literal(0))
             this.finalizeProc(this.mainProc)
-            if (this.usedSpecs.length > 0)
-                this.markMethodUsed("#ds.Role._onPacket")
             this.emitProtoAssigns()
         })
 
@@ -2168,46 +2204,6 @@ class Program implements TopOpWriter {
         this.emitIgnoredExpression(stmt.expression)
     }
 
-    private uniqueProcName(base: string) {
-        let suff = 0
-        while (this.procs.some(p => p.name == base + "_" + suff)) suff++
-        return base + "_" + suff
-    }
-
-    private emitHandler(
-        name: string,
-        func: Expr,
-        options: {
-            every?: number
-        } = {}
-    ): Procedure {
-        if (!ts.isArrowFunction(func))
-            throwError(func, "arrow function expected here")
-        const proc = new Procedure(this, this.uniqueProcName(name), func)
-        proc.useFrom(func)
-        proc.writer.ret = proc.writer.mkLabel("ret")
-        if (func.parameters.length)
-            throwError(func, "parameters not supported here")
-        this.withProcedure(proc, wr => {
-            this.emitParameters(func, proc)
-            if (options.every) {
-                this.emitSleep(options.every)
-            }
-            if (ts.isBlock(func.body)) {
-                this.emitStmt(func.body)
-            } else {
-                this.ignore(this.emitExpr(func.body))
-            }
-            wr.emitLabel(wr.ret)
-            if (options.every) wr.emitJump(wr.top)
-            else {
-                wr.emitStmt(Op.STMT1_RETURN, literal(undefined))
-            }
-            this.finalizeProc(proc)
-        })
-        return proc
-    }
-
     private requireArgs(
         expr: ts.CallExpression | ts.NewExpression | CallLike,
         num: number
@@ -2217,14 +2213,6 @@ class Program implements TopOpWriter {
             throwError(
                 (expr as any).position || expr,
                 `${num} arguments required; got ${expr.arguments.length}`
-            )
-    }
-
-    private requireTopLevel(expr: ts.Node) {
-        if (!this.isTopLevel(expr))
-            throwError(
-                expr,
-                "this can only be done at the top-level of the program"
             )
     }
 
@@ -2292,20 +2280,7 @@ class Program implements TopOpWriter {
     private emitGenericCall(args: Expr[], fn: Value) {
         const wr = this.writer
         if (args.some(ts.isSpreadElement)) {
-            wr.emitStmt(Op.STMT1_ALLOC_ARRAY, literal(0))
-            const arr = wr.cacheValue(this.retVal())
-            for (const a of args) {
-                let expr: Value
-                let meth = "push"
-                if (ts.isSpreadElement(a)) {
-                    expr = this.emitExpr(a.expression)
-                    meth = "pushRange"
-                } else {
-                    expr = this.emitExpr(a)
-                }
-                wr.emitCall(wr.emitIndex(arr.emit(), wr.emitString(meth)), expr)
-            }
-            wr.emitStmt(Op.STMT2_CALL_ARRAY, fn, arr.finalEmit())
+            wr.emitStmt(Op.STMT2_CALL_ARRAY, fn, this.emitArray(args))
             this.onCall()
         } else {
             wr.emitCall(fn, ...this.emitArgs(args))
@@ -2324,22 +2299,126 @@ class Program implements TopOpWriter {
         return undefined
     }
 
-    private bufferLiteral(expr: Expr): Uint8Array {
-        if (
-            expr &&
-            ts.isTaggedTemplateExpression(expr) &&
-            idName(expr.tag) == "hex"
+    private decodeImage(node: ts.Node, s: string) {
+        const matrix: number[][] = []
+        let line: number[] = []
+        let width = 0
+        s += "\n"
+        for (let i = 0; i < s.length; ++i) {
+            let c = s[i]
+            switch (c) {
+                case " ":
+                case "\t":
+                    break
+                case "\n":
+                    if (line.length > 0) {
+                        matrix.push(line)
+                        width = Math.max(line.length, width)
+                        line = []
+                    }
+                    break
+                case ".":
+                    line.push(0)
+                    break
+                case "#":
+                    line.push(1)
+                    break
+                default:
+                    let n = -1
+                    if (/[0-9]/.test(c)) n = +c
+                    else if (/[a-z]/i.test(c))
+                        n =
+                            c.toLowerCase().charCodeAt(0) -
+                            "a".charCodeAt(0) +
+                            10
+                    if (n < 0 || n >= 16)
+                        throwError(
+                            node,
+                            `invalid character ${JSON.stringify(
+                                c
+                            )} in img\`...\` literal`
+                        )
+                    line.push(n)
+                    break
+            }
+        }
+
+        const bpp = 4
+        const height = matrix.length
+        const buf = f4EncodeImg(width, height, bpp, (x, y) => matrix[y][x] || 0)
+        const wr = this.writer
+        const alloc = wr.builtInMember(
+            wr.emitBuiltInObject(BuiltInObject.IMAGE),
+            BuiltInString.ALLOC
+        )
+        wr.emitCall(
+            alloc,
+            literal(width),
+            literal(height),
+            literal(bpp),
+            wr.emitString(buf)
+        )
+        return this.retVal()
+
+        function f4EncodeImg(
+            w: number,
+            h: number,
+            bpp: number,
+            getPix: (x: number, y: number) => number
         ) {
+            const r: number[] = []
+            let ptr = 0
+            let curr = 0
+            let shift = 0
+
+            const pushBits = (n: number) => {
+                curr |= n << shift
+                if (shift == 8 - bpp) {
+                    r.push(curr)
+                    ptr++
+                    curr = 0
+                    shift = 0
+                } else {
+                    shift += bpp
+                }
+            }
+
+            for (let i = 0; i < w; ++i) {
+                for (let j = 0; j < h; ++j) pushBits(getPix(i, j))
+                while (shift != 0) pushBits(0)
+                if (bpp > 1) {
+                    while (ptr & 3) pushBits(0)
+                }
+            }
+
+            return new Uint8Array(r)
+        }
+    }
+
+    private decodeHexLiteral(expr: ts.TaggedTemplateExpression) {
+        const text = (expr.template as ts.NoSubstitutionTemplateLiteral).text
+        const hexbuf = text
+            .replace(/\/\/.*$/gm, "") // remove comments
+            .replace(/\s+/g, "")
+            .toLowerCase()
+        const m = /[^0-9a-f]/.exec(hexbuf)
+        if (m) throwError(expr, `invalid character in hex: ${m[0]}`)
+        if (hexbuf.length & 1) throwError(expr, "non-even hex length")
+        return this.writer.emitString(fromHex(hexbuf))
+    }
+
+    private bufferLiteral(expr: Expr) {
+        if (expr && ts.isTaggedTemplateExpression(expr)) {
+            const tp = idName(expr.tag)
+            if (tp !== "hex" && tp !== "img") return undefined
+
             if (!ts.isNoSubstitutionTemplateLiteral(expr.template))
                 throwError(
                     expr,
-                    "${}-expressions not supported in hex literals"
+                    `\${}-expressions not supported in ${tp} literals`
                 )
-            const hexbuf = expr.template.text.replace(/\s+/g, "").toLowerCase()
-            if (hexbuf.length & 1) throwError(expr, "non-even hex length")
-            if (!/^[0-9a-f]*$/.test(hexbuf))
-                throwError(expr, "invalid characters in hex")
-            return fromHex(hexbuf)
+            if (tp == "img") return this.decodeImage(expr, expr.template.text)
+            return this.decodeHexLiteral(expr)
         }
 
         return undefined
@@ -2368,22 +2447,13 @@ class Program implements TopOpWriter {
             return wr.emitString(stringLiteral)
         } else {
             const buf = this.bufferLiteral(expr)
-            if (buf) {
-                return wr.emitString(buf)
-            } else {
-                throwError(expr, "expecting a string literal here")
-            }
+            if (buf) return buf
+            else throwError(expr, "expecting a string literal here")
         }
     }
 
     private emitArgs(args: Expr[]) {
         return args.map(arg => this.emitExpr(arg))
-    }
-
-    private forceNumberLiteral(expr: Expr) {
-        const tmp = this.emitExpr(expr)
-        if (!tmp.isLiteral) throwError(expr, "number literal expected")
-        return tmp.numValue
     }
 
     private isStringLike(expr: Expr) {
@@ -2786,11 +2856,28 @@ class Program implements TopOpWriter {
 
     private emitBuiltInConst(expr: ts.Expression) {
         const tags = getSymTags(this.getSymAtLocation(expr))
-        const gpio = parseInt(tags["ds-gpio"])
-        if (!isNaN(gpio)) {
-            const wr = this.writer
-            wr.emitCall(this.dsMember("gpio"), literal(gpio))
-            return this.retVal()
+        const nat = tags[TSDOC_NATIVE]
+        const wr = this.writer
+        if (nat) {
+            if (nat.startsWith("GPIO.")) {
+                return wr.emitIndex(
+                    wr.emitBuiltInObject(BuiltInObject.GPIO),
+                    wr.emitString(nat.slice(5))
+                )
+            }
+            const id = builtInObjByName["#" + nat]
+            if (id === undefined) {
+                this.reportError(
+                    expr,
+                    "allowed names: " +
+                        Object.keys(builtInObjByName)
+                            .map(s => s.slice(1))
+                            .join(", "),
+                    ts.DiagnosticCategory.Message
+                )
+                throwError(expr, `invalid @${TSDOC_NATIVE} tag '${nat}'`)
+            }
+            return wr.emitBuiltInObject(id)
         }
         return this.emitBuiltInConstByName(this.nodeName(expr))
     }
@@ -2967,6 +3054,12 @@ class Program implements TopOpWriter {
         )
             return true
         if (this.isBuiltInObj(this.nodeName(expr.expression))) return true
+
+        const nat = getSymTags(this.getSymAtLocation(expr.expression))[
+            TSDOC_NATIVE
+        ]
+        if (nat && nat.endsWith(".prototype")) return true
+
         return false
     }
 
@@ -3080,6 +3173,87 @@ class Program implements TopOpWriter {
         return false
     }
 
+    private emitJsxElement(
+        expr: ts.Node,
+        openingElement: ts.JsxSelfClosingElement | ts.JsxOpeningElement,
+        children?: ts.NodeArray<ts.JsxChild>
+    ): Value {
+        const wr = this.writer
+
+        let fn: Value
+        if (!openingElement) fn = wr.emitString("")
+        else {
+            const tag = idName(openingElement.tagName)
+            if (tag && tag[0].toLowerCase() == tag[0]) fn = wr.emitString(tag)
+            else fn = this.emitExpr(openingElement.tagName)
+        }
+
+        wr.emitStmt(Op.STMT0_ALLOC_MAP)
+        const opts = wr.cacheValue(this.retVal())
+
+        for (const attr of openingElement?.attributes.properties ?? []) {
+            if (ts.isJsxSpreadAttribute(attr)) {
+                wr.emitCall(
+                    wr.objectMember(BuiltInString.ASSIGN),
+                    opts.emit(),
+                    this.emitExpr(attr.expression)
+                )
+            } else {
+                const fld = this.forceName(attr.name)
+                const init = attr.initializer
+                    ? this.emitExpr(attr.initializer)
+                    : literal(true)
+                wr.emitStmt(
+                    Op.STMT3_INDEX_SET,
+                    opts.emit(),
+                    wr.emitString(fld),
+                    init
+                )
+            }
+        }
+
+        const semanticChildren = !children
+            ? []
+            : children.filter(i => {
+                  switch (i.kind) {
+                      case SK.JsxExpression:
+                          return !!i.expression
+                      case SK.JsxText:
+                          return !i.containsOnlyTriviaWhiteSpaces
+                      default:
+                          return true
+                  }
+              })
+
+        const singleChild =
+            semanticChildren.length == 1 &&
+            !(
+                ts.isJsxExpression(semanticChildren[0]) &&
+                semanticChildren[0].dotDotDotToken
+            )
+
+        if (semanticChildren.length > 0) {
+            const children = singleChild
+                ? this.emitExpr(semanticChildren[0])
+                : this.emitArray(semanticChildren)
+            wr.emitStmt(
+                Op.STMT3_INDEX_SET,
+                opts.emit(),
+                wr.emitString("children"),
+                children
+            )
+        }
+
+        this.markMethodUsed("#ds._jsx")
+
+        const jsxFn = wr.emitIndex(
+            wr.emitBuiltInObject(BuiltInObject.DEVICESCRIPT),
+            wr.emitString("_jsx")
+        )
+        wr.emitCall(jsxFn, fn, opts.finalEmit())
+        return this.retVal()
+    }
+
     private emitBinaryExpression(expr: ts.BinaryExpression): Value {
         const simpleOps: SMap<Op> = {
             [SK.PlusToken]: Op.EXPR2_ADD,
@@ -3165,15 +3339,20 @@ class Program implements TopOpWriter {
 
         const wr = this.writer
 
-        if (op == SK.AmpersandAmpersandToken || op == SK.BarBarToken) {
+        if (
+            op == SK.AmpersandAmpersandToken ||
+            op == SK.BarBarToken ||
+            op == SK.QuestionQuestionToken
+        ) {
             const a = this.emitExpr(expr.left)
             const tmp = wr.cacheValue(a, true)
-            const tst = wr.emitExpr(
-                op == SK.AmpersandAmpersandToken
-                    ? Op.EXPR1_TO_BOOL
-                    : Op.EXPR1_NOT,
-                tmp.emit()
-            )
+            let tst: Value
+            if (op == SK.QuestionQuestionToken)
+                tst = wr.emitExpr(Op.EXPR1_IS_NULLISH, tmp.emit())
+            else if (op == SK.BarBarToken)
+                tst = wr.emitExpr(Op.EXPR1_NOT, tmp.emit())
+            else tst = wr.emitExpr(Op.EXPR1_TO_BOOL, tmp.emit())
+
             const skipB = wr.mkLabel("lazyB")
             wr.emitJumpIfFalse(skipB, tst)
             tmp.store(this.emitExpr(expr.right))
@@ -3254,22 +3433,57 @@ class Program implements TopOpWriter {
         return wr.emitExpr(op, this.emitExpr(arg))
     }
 
-    private emitArrayExpression(expr: ts.ArrayLiteralExpression): Value {
+    private emitArray(elements: ReadonlyArray<Expr>): Value {
         const wr = this.writer
-        const sz = expr.elements.length
-        wr.emitStmt(Op.STMT1_ALLOC_ARRAY, literal(sz))
-        const arr = wr.emitExpr(Op.EXPR0_RET_VAL)
-        if (sz == 0) return arr
-        const ref = wr.cacheValue(arr)
-        for (let i = 0; i < sz; ++i) {
-            wr.emitStmt(
-                Op.STMT3_INDEX_SET,
-                ref.emit(),
-                literal(i),
-                this.emitExpr(expr.elements[i])
-            )
+        const sz = elements.length
+        const spreadInner = (e: Expr) => {
+            if (ts.isSpreadElement(e)) return e.expression
+            if (ts.isJsxExpression(e) && e.dotDotDotToken) return e.expression
+            return undefined
         }
-        return ref.finalEmit()
+        const numSpread = elements.filter(
+            e => spreadInner(e) != undefined
+        ).length
+
+        // since 2.15.0 all runtimes should treat size arg to ALLOC_ARRAY as hint
+        const allocSz = BinFmt.IMG_VERSION >= 0x20f0000 ? sz - numSpread : 0
+        wr.emitStmt(Op.STMT1_ALLOC_ARRAY, literal(allocSz))
+        const chunk = 8 // max. args to .push()
+
+        if (elements.length == 0) return this.retVal()
+
+        const arr = wr.cacheValue(this.retVal())
+        let curr: Value[] = []
+
+        const flushCurr = () => {
+            if (!curr.length) return
+            wr.emitCall(
+                wr.emitIndex(arr.emit(), wr.emitString("push")),
+                ...curr
+            )
+            curr = []
+        }
+
+        for (const elt of elements) {
+            const spr = spreadInner(elt)
+            if (spr) {
+                flushCurr()
+                wr.emitCall(
+                    wr.emitIndex(arr.emit(), wr.emitString("pushRange")),
+                    this.emitExpr(spr)
+                )
+            } else {
+                curr.push(this.emitExpr(elt))
+            }
+            if (curr.length >= chunk) flushCurr()
+        }
+        flushCurr()
+
+        return arr.finalEmit()
+    }
+
+    private emitArrayExpression(expr: ts.ArrayLiteralExpression): Value {
+        return this.emitArray(expr.elements)
     }
 
     private markMethodUsed(meth: string) {
@@ -3627,6 +3841,26 @@ class Program implements TopOpWriter {
                 return this.emitConditionalExpression(
                     expr as ts.ConditionalExpression
                 )
+            case SK.JsxElement:
+                return this.emitJsxElement(
+                    expr,
+                    (expr as ts.JsxElement).openingElement,
+                    (expr as ts.JsxElement).children
+                )
+            case SK.JsxSelfClosingElement:
+                return this.emitJsxElement(
+                    expr,
+                    expr as ts.JsxSelfClosingElement
+                )
+            case SK.JsxFragment:
+                return this.emitJsxElement(
+                    expr,
+                    null,
+                    (expr as ts.JsxFragment).children
+                )
+            case SK.JsxExpression:
+                assert(!(expr as ts.JsxExpression).dotDotDotToken)
+                return this.emitExpr((expr as ts.JsxExpression).expression)
             default:
                 // console.log(expr)
                 return throwError(expr, "unhandled expr: " + SK[expr.kind])
@@ -3684,7 +3918,10 @@ class Program implements TopOpWriter {
                 case SK.ForStatement:
                     return this.emitForStatement(stmt as ts.ForStatement)
                 case SK.ForOfStatement:
-                    return this.emitForOfStatement(stmt as ts.ForOfStatement)
+                case SK.ForInStatement:
+                    return this.emitForInOrOfStatement(
+                        stmt as ts.ForOfStatement
+                    )
                 case SK.ContinueStatement:
                 case SK.BreakStatement:
                     return this.emitBreakContStatement(
@@ -3818,7 +4055,8 @@ class Program implements TopOpWriter {
                             !pkt.fields[0].startRepeats &&
                             !isBytes(pkt.fields[0]))
                     )
-                        return -1 // inline field
+                        // inline field
+                        return -1
                     else {
                         const r = specWriter.currSize >> 2
                         for (const f of pkt.fields) {
@@ -4121,9 +4359,59 @@ class Program implements TopOpWriter {
         this.host.write(DEVS_LIB_FILE, JSON.stringify(lib, null, 1))
     }
 
+    private readFile(fileName: string) {
+        try {
+            return this.host.read(fileName)
+        } catch (e) {
+            return undefined
+        }
+    }
+
+    private readSettings(): Record<string, Uint8Array> {
+        try {
+            const MAX_SETTING_NAME_LENGTH = 14
+            const envDefaults = parseToSettings(
+                this.readFile("./.env.defaults"),
+                false
+            )
+            const d = Object.keys(envDefaults).find(
+                k => k.length > MAX_SETTING_NAME_LENGTH
+            )
+            if (d)
+                this.printDiag(
+                    mkDiag(
+                        "./.env.defaults",
+                        `setting name '${d}' too long (max ${MAX_SETTING_NAME_LENGTH} chars)`
+                    )
+                )
+            const envLocal = parseToSettings(
+                this.readFile("./.env.local"),
+                true
+            )
+            const l = Object.keys(envDefaults).find(
+                k => k.length > MAX_SETTING_NAME_LENGTH
+            )
+            if (l)
+                this.printDiag(
+                    mkDiag(
+                        "./.env.local",
+                        `setting name '${d}' too long (max ${
+                            MAX_SETTING_NAME_LENGTH - 1
+                        } chars)`
+                    )
+                )
+
+            const settings = { ...envDefaults, ...envLocal }
+            return settings
+        } catch (e) {
+            return undefined
+        }
+    }
+
     emit(): CompilationResult {
         assert(!this.tree)
 
+        const settings = this.readSettings()
         const ast = buildAST(
             this.mainFileName,
             this.host,
@@ -4203,6 +4491,7 @@ class Program implements TopOpWriter {
             usedFiles: ast.usedFiles(),
             diagnostics: this.diagnostics,
             config: this.host.getConfig(),
+            settings,
         }
     }
 }
@@ -4214,6 +4503,7 @@ export interface CompilationResult {
     usedFiles: string[]
     diagnostics: DevsDiagnostic[]
     config?: ResolvedBuildConfig
+    settings?: Record<string, Uint8Array>
 }
 
 /**

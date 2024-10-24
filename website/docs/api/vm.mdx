@@ -5,7 +5,7 @@ sidebar_position: 100
 
 # Web Assembly Virtual Machine
 
-The `@devicescript/vm` package contains DeviceScript C virtual machine compiled to Web Assembly. It allows you to run bytecode in node.js and browsers
+The `@devicescript/vm` package contains DeviceScript C virtual machine compiled to Web Assembly. It allows you to run bytecode in node.js and browsers.
 
 This package is used in the [CLI](/api/cli/) and in developer tools web page.
 
@@ -75,7 +75,7 @@ const running = vm.devsIsRunning()
 ## devsInit
 
 This method allocates data structures necessary for running the virtual machine.
-It is automatically called by other metods.
+It is automatically called by other methods.
 
 ```js
 vm.devsInit()
@@ -83,7 +83,7 @@ vm.devsInit()
 
 ## devsVerify
 
-Verifies that a buffer of bytecode is well formed. Returns non-zero error codes when failing.
+Verifies that a buffer of bytecode is well-formed. Returns non-zero error codes when failing.
 
 ```js
 const res = vm.devsVerify()

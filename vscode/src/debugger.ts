@@ -5,19 +5,16 @@ import {
 } from "./deploy"
 import { DeviceScriptExtensionState } from "./state"
 import { WorkspaceFolder, DebugConfiguration, CancellationToken } from "vscode"
-import { CHANGE, SRV_DEVICE_SCRIPT_MANAGER, SRV_ROLE_MANAGER } from "jacdac-ts"
+import {
+    CHANGE,
+    DeviceScriptManagerReg,
+    SRV_DEVICE_SCRIPT_MANAGER,
+    SRV_ROLE_MANAGER,
+} from "jacdac-ts"
 import type { StartArgs } from "@devicescript/dap"
 import { Utils } from "vscode-uri"
 import { checkFileExists } from "./fs"
 import { showErrorMessage } from "./telemetry"
-
-function startSimulatorsOnStart() {
-    const settings = vscode.workspace.getConfiguration("devicescript.debugger")
-    if (settings.get("showTerminalOnStart"))
-        vscode.commands.executeCommand("extension.devicescript.terminal.show")
-    if (settings.get("showSimulatorsOnStart"))
-        vscode.commands.executeCommand("extension.devicescript.openSimulators")
-}
 
 export function activateDebugger(extensionState: DeviceScriptExtensionState) {
     const { context } = extensionState
@@ -32,6 +29,7 @@ export function activateDebugger(extensionState: DeviceScriptExtensionState) {
         )
     )
     trackRolesAndSimulators(extensionState)
+    trackDeviceScriptManagers(extensionState)
 
     subscriptions.push(
         vscode.commands.registerCommand(
@@ -154,6 +152,45 @@ function trackRolesAndSimulators(extensionState: DeviceScriptExtensionState) {
     })
 }
 
+/**
+ * Stop devicescript managers when debugging session ends
+ */
+function trackDeviceScriptManagers(extensionState: DeviceScriptExtensionState) {
+    const { context } = extensionState
+    const { subscriptions } = context
+    let deviceId: string
+    vscode.debug.onDidStartDebugSession(
+        session => {
+            if (session.type !== "devicescript") return
+
+            const config = session.configuration
+            const dsConfig = config as StartArgs
+            deviceId = dsConfig.deviceId
+        },
+        undefined,
+        subscriptions
+    )
+    vscode.debug.onDidTerminateDebugSession(
+        async session => {
+            if (session.type === "devicescript" && deviceId) {
+                const dev = extensionState.bus.device(deviceId, true)
+                const managers = dev?.services({
+                    serviceClass: SRV_DEVICE_SCRIPT_MANAGER,
+                })
+                if (managers)
+                    for (const manager of managers) {
+                        const running = manager.register(
+                            DeviceScriptManagerReg.Running
+                        )
+                        await running.sendSetBoolAsync(false)
+                    }
+            }
+        },
+        undefined,
+        subscriptions
+    )
+}
+
 export class DeviceScriptAdapterServerDescriptorFactory
     implements vscode.DebugAdapterDescriptorFactory
 {
@@ -174,6 +211,24 @@ export class DeviceScriptConfigurationProvider
 
     get bus() {
         return this.extensionState.bus
+    }
+
+    private simsShownOnce = false
+    private startSimulatorsOnStart() {
+        const settings = vscode.workspace.getConfiguration(
+            "devicescript.debugger"
+        )
+        if (settings.get("showTerminalOnStart"))
+            vscode.commands.executeCommand(
+                "extension.devicescript.terminal.show"
+            )
+        if (settings.get("showSimulatorsOnStart")) {
+            vscode.commands.executeCommand(
+                "extension.devicescript.openSimulators",
+                { askUser: this.simsShownOnce }
+            )
+            this.simsShownOnce = true
+        }
     }
 
     async resolveDebugConfigurationWithSubstitutedVariables(
@@ -304,10 +359,8 @@ export class DeviceScriptConfigurationProvider
             service
         )
         if (!buildResult?.success) {
-            showErrorMessage(
-                "debug.builderrors",
-                `Debug cancelled\nProgram has build errors.`
-            )
+            // show errors
+            vscode.commands.executeCommand("workbench.action.problems.focus")
             return undefined
         }
         // save as currently debugged project
@@ -315,9 +368,8 @@ export class DeviceScriptConfigurationProvider
             service.device.deviceId
         )
 
-
         // show UI
-        startSimulatorsOnStart()
+        this.startSimulatorsOnStart()
 
         // run, no debug
         if (sessionConfig?.noDebug) {

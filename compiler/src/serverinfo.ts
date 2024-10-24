@@ -4,7 +4,7 @@ import { Host } from "./format"
 import { preludeFiles } from "./specgen"
 import { camelize, upperCamel } from "./util"
 import { ServerInfoFile } from "@devicescript/interop"
-import { getSymTags } from "./compiler"
+import { TSDOC_PART, TSDOC_SERVICES, getSymTags } from "./compiler"
 
 export function serverInfo(host: Host) {
     const { program } = buildAST(
@@ -33,18 +33,49 @@ export function serverInfo(host: Host) {
                 stmt.name.text.startsWith("start")
             ) {
                 customServer(stmt)
+            } else if (
+                ts.isClassDeclaration(stmt) &&
+                ts.isIdentifier(stmt.name)
+            ) {
+                customDriver(stmt)
             }
         }
     }
 
     return info
 
+    function extractDetails(stmt: ts.Statement) {
+        return stmt
+            .getFullText()
+            .replace(/\s*\/\*\*\s+(\*\s*)*/, "")
+            .replace(/\r?\n[^]*/, "")
+    }
+
+    function customDriver(stmt: ts.ClassDeclaration) {
+        const sym = checker.getSymbolAtLocation(stmt.name)
+        const tags = getSymTags(sym, "")
+        if (!tags[TSDOC_PART]) return
+
+        const snippet = `const shield = new ${sym.name}()\n`
+        const detail = extractDetails(stmt)
+
+        info.servers.push({
+            label: tags[TSDOC_PART] ?? sym.name.slice("start".length),
+            detail,
+            startName: sym.name,
+            imports: {
+                [sym.name]: "@devicescript/drivers",
+            },
+            snippet,
+        })
+    }
+
     function customServer(stmt: ts.FunctionDeclaration) {
         const sym = checker.getSymbolAtLocation(stmt.name)
         const tags = getSymTags(sym, "")
-        if (!tags["ds-part"]) return
+        if (!tags[TSDOC_PART]) return
 
-        const serv = (tags?.["ds-services"] ?? "")
+        const serv = (tags?.[TSDOC_SERVICES] ?? "")
             .split(/[,;\s]+/)
             .filter(Boolean)
             .map(servName => {
@@ -57,10 +88,7 @@ export function serverInfo(host: Host) {
                 return spec
             })
 
-        const detail = stmt
-            .getFullText()
-            .replace(/\s*\/\*\*\s+(\*\s*)*/, "")
-            .replace(/\n[^]*/, "")
+        const detail = extractDetails(stmt)
 
         let tp = checker
             .getTypeAtLocation(stmt.name)
@@ -91,7 +119,7 @@ export function serverInfo(host: Host) {
         const snippet = `const ${varName} = ${isAwait}${sym.name}()\n`
 
         info.servers.push({
-            label: tags["ds-part"] ?? sym.name.slice("start".length),
+            label: tags[TSDOC_PART] ?? sym.name.slice("start".length),
             detail,
             startName: sym.name,
             classIdentifiers: serv.length

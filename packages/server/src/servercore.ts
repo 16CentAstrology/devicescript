@@ -1,6 +1,17 @@
 import * as ds from "@devicescript/core"
+import { SequentialWorker } from "@devicescript/runtime"
 
-export interface ServerOptions {}
+type DsServer = typeof ds & {
+    _onServerPacket(pkt: ds.Packet): Promise<void>
+    _serverSend(serviceIndex: number, pkt: ds.Packet): Promise<void>
+}
+
+export interface ServerOptions {
+    roleName?: string
+    simOk?: boolean
+}
+
+let eventWorker: SequentialWorker
 
 export class Server implements ds.ServerInterface {
     serviceIndex: number
@@ -8,11 +19,14 @@ export class Server implements ds.ServerInterface {
     private readonly _instanceName: string
     private _stateCode: number = undefined
 
-    constructor(public spec: ds.ServiceSpec, options?: ServerOptions) {}
+    constructor(
+        public spec: ds.ServiceSpec,
+        options?: ServerOptions
+    ) {}
 
     async _send(pkt: ds.Packet) {
         if (this.debug) console.debug("Out SRV", pkt, pkt.spec)
-        await ds._serverSend(this.serviceIndex, pkt)
+        await (ds as DsServer)._serverSend(this.serviceIndex, pkt)
     }
 
     statusCode(): ds.AsyncValue<[number, number]> {
@@ -22,6 +36,23 @@ export class Server implements ds.ServerInterface {
 
     set_statusCode(code: number, vendorCode: number) {
         this._stateCode = (code << 16) | (vendorCode & 0xffff)
+    }
+
+    async sendEvent(pkt: ds.Packet) {
+        if (!eventWorker) eventWorker = new SequentialWorker()
+        const self = this
+        let prep = false
+        const sendp = async () => {
+            if (!prep) {
+                prep = true
+                // prep packet as an event:
+                await (ds as DsServer)._serverSend(0x100, pkt)
+            }
+            await self._send(pkt)
+        }
+        eventWorker.queue(sendp, 0)
+        eventWorker.queue(sendp, 20)
+        eventWorker.queue(sendp, 70)
     }
 }
 
@@ -137,10 +168,10 @@ function attachName(s: ds.BaseServerSpec, name: string) {
     if (name) s.instanceName = () => name
 }
 
-export function startServer(s: ds.ServerInterface, name?: string) {
+export function startServer(s: ds.ServerInterface, options?: ServerOptions) {
     if (!servers) {
         servers = [new ControlServer()]
-        ;(ds as typeof ds)._onServerPacket = _onServerPacket
+        ;(ds as DsServer)._onServerPacket = _onServerPacket
         setInterval(async () => {
             const iserv = servers[0] as ds.ControlServerSpec
             const spec = ds.Control.spec.lookup("announce")
@@ -161,7 +192,7 @@ export function startServer(s: ds.ServerInterface, name?: string) {
         if (o === s) break
         if (o.spec.classIdentifier === s.spec.classIdentifier) off++
     }
-    let roleName = name
+    let roleName = options?.roleName
     if (!roleName) roleName = s.spec.name + "_" + off
     attachName(s, roleName)
     return `${roleName}[app:${off}]`

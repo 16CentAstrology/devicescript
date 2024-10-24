@@ -10,7 +10,6 @@ import { I2CSensorDriver } from "./driver"
 
 // based on https://github.com/adafruit/Adafruit_CircuitPython_BME680/blob/main/adafruit_bme680.py
 
-const BME680_ADDR = 0x77
 const BME680_THROTTLE = 100
 
 const BME680_CHIPID = 0x61
@@ -103,8 +102,8 @@ class BME680Driver extends I2CSensorDriver<{
     private _LOOKUP_TABLE_1: number[]
     private _LOOKUP_TABLE_2: number[]
 
-    constructor() {
-        super(BME680_ADDR, { readCacheTime: BME680_THROTTLE })
+    constructor(addr: 0x77 | 0x76) {
+        super(addr, { readCacheTime: BME680_THROTTLE })
     }
 
     override async initDriver(): Promise<void> {
@@ -112,7 +111,8 @@ class BME680Driver extends I2CSensorDriver<{
         await delay(5)
         const id = await this.readReg(BME680_REG_CHIPID)
         console.debug(`BME680 id=${id}`)
-        if (id !== BME680_CHIPID) throw new DriverError(`BME680: wrong chip id`)
+        if (id !== BME680_CHIPID)
+            throw new DriverError(`BME680: wrong chip id (${id})`)
         this.chipVariant = await this.readReg(BME680_REG_VARIANT)
         await this.readCalibration()
 
@@ -252,7 +252,7 @@ class BME680Driver extends I2CSensorDriver<{
         let var6 = (var4 * var5) / 2
         let calc_hum = (((var3 + var6) / 1024) * 1000) / 4096
         calc_hum /= 1000 // get back to RH
-        return Math.clamp(0, calc_hum, 100)
+        return Math.constrain(calc_hum, 0, 100)
     }
 
     private fillTables() {
@@ -311,23 +311,30 @@ class BME680Driver extends I2CSensorDriver<{
 }
 
 /**
- * Start driver for Bosch BME680 temperature/humidity/pressure/gas sensor at I2C `0x77`.
- * @link https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme680-ds001.pdf Datasheet
- * @link https://www.adafruit.com/product/3660 Adafruit
- * @ds-part Bosch BME68
- * @ds-services temperature, humidity, airPressure, airQualityIndex
+ * Start driver for Bosch BME680 temperature/humidity/pressure/gas sensor at I2C `0x76` (default) or `0x77`.
+ * @see {@link https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme680-ds001.pdf | Datasheet}
+ * @see {@link https://www.adafruit.com/product/3660 | Adafruit}
+ * @devsPart Bosch BME68
+ * @devsServices temperature, humidity, airPressure, airQualityIndex
  * @throws DriverError
  */
 export async function startBME680(options?: {
+    address?: 0x77 | 0x76
     temperatureName?: string
     humidityName?: string
     pressureName?: string
     airQualityIndexName?: string
     baseName?: string
 }) {
-    const { baseName, temperatureName, humidityName, pressureName, airQualityIndexName } =
-        options || {}
-    const driver = new BME680Driver()
+    const {
+        baseName,
+        temperatureName,
+        humidityName,
+        pressureName,
+        airQualityIndexName,
+        address,
+    } = options || {}
+    const driver = new BME680Driver(address || 0x76)
     await driver.init()
     return {
         temperature: startTemperature({

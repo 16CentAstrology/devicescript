@@ -1,9 +1,9 @@
 {
     "name": "devicescript-vscode",
     "displayName": "DeviceScript",
-    "version": "2.9.10",
+    "version": "2.16.4",
     "publisher": "devicescript",
-    "description": "Professional TypeScript for microcontrollers.",
+    "description": "TypeScript for microcontrollers.",
     "author": {
         "name": "Microsoft Corporation"
     },
@@ -28,7 +28,7 @@
         "Jacdac"
     ],
     "engines": {
-        "vscode": "^1.76.0"
+        "vscode": "^1.85.0"
     },
     "icon": "images/devs-logo.png",
     "categories": [
@@ -56,18 +56,18 @@
     },
     "devDependencies": {
         "@devicescript/interop": "*",
-        "@types/isomorphic-fetch": "^0.0.36",
-        "@types/papaparse": "^5.3.7",
-        "@types/vscode": "^1.76.0",
-        "@vscode/debugadapter": "^1.59.0",
-        "@vscode/debugadapter-testsupport": "^1.59.0",
-        "@vscode/extension-telemetry": "^0.7.7",
-        "@vscode/vsce": "^2.19.0",
+        "@types/isomorphic-fetch": "^0.0.39",
+        "@types/papaparse": "^5.3.14",
+        "@types/vscode": "^1.85.0",
+        "@vscode/debugadapter": "^1.64.0",
+        "@vscode/debugadapter-testsupport": "^1.64.0",
+        "@vscode/extension-telemetry": "^0.9.1",
+        "@vscode/vsce": "^2.22.0",
         "isomorphic-fetch": "^3.0.0",
         "jacdac-ts": "*",
         "papaparse": "^5.4.1",
         "typescript": "^4.9.5",
-        "vscode-uri": "^3.0.7",
+        "vscode-uri": "^3.0.8",
         "webfont": "^11.2.26",
         "websocket-polyfill": "^0.0.3"
     },
@@ -88,6 +88,9 @@
     ],
     "workspaceTrust": {
         "request": "never"
+    },
+    "capabilities": {
+        "virtualWorkspaces": false
     },
     "contributes": {
         "configuration": {
@@ -114,6 +117,30 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Enables additional logging or allows to connect to device outside the catalog.",
+                    "scope": "machine-overridable"
+                },
+                "devicescript.devtools.verbose": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable debug output logging.",
+                    "scope": "machine-overridable"
+                },
+                "devicescript.devtools.localhost": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Listens for a jacdac-docs devtools server at localhost:8000",
+                    "scope": "machine-overridable"
+                },
+                "devicescript.devtools.internet": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "allows connections from non-localhost on developer server",
+                    "scope": "machine-overridable"
+                },
+                "devicescript.connect.web": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Force connection using an external web page.",
                     "scope": "machine-overridable"
                 },
                 "devicescript.jacdac.diagnostics": {
@@ -184,22 +211,25 @@
             "devicescript": [
                 {
                     "id": "extension.devicescript.jdom",
-                    "name": "Devices"
+                    "name": "Devices",
+                    "initialSize": 3
                 },
                 {
                     "id": "extension.devicescript.watch",
-                    "name": "Watch"
+                    "name": "Watch",
+                    "visibility": "collapsed"
                 },
                 {
                     "id": "extension.devicescript.gateway",
-                    "name": "Development Gateway"
+                    "name": "Development Gateway",
+                    "visibility": "hidden"
                 }
             ]
         },
         "viewsWelcome": [
             {
                 "view": "extension.devicescript.jdom",
-                "contents": "Start a simulator or connect to a device.\n[Start Simulator](command:extension.devicescript.simulator.start)\n[Connect Device](command:extension.devicescript.connect)\n\nTo learn more about DeviceScript, [read the docs](https://microsoft.github.io/devicescript/intro) or browse the list of [devices](https://microsoft.github.io/devicescript/devices/)."
+                "contents": "Start a device simulator, no hardware needed.\n[Start Simulator](command:extension.devicescript.simulator.start)\n\nConnect to a hardware device using serial or USB.\n[Connect Device](command:extension.devicescript.connect)\n\nStart a new project in the current workspace or in a new folder.\n[Create New Project](command:extension.devicescript.project.new)\n\nTo learn more about DeviceScript, [read the docs](https://microsoft.github.io/devicescript/intro) or browse the list of [devices](https://microsoft.github.io/devicescript/devices/)."
             },
             {
                 "view": "extension.devicescript.watch",
@@ -208,10 +238,6 @@
             {
                 "view": "extension.devicescript.dbgwatch",
                 "contents": "Select Registers or Events to watch."
-            },
-            {
-                "view": "extension.devicescript.gateway",
-                "contents": "Deploy scripts remotely, track telemetry.\n[Configure...](command:extension.devicescript.gateway.configure)\n[Create Gateway](https://microsoft.github.io/devicescript/developer/cloud/gateway)\n\nTo learn more about DeviceScript Gateway, [read the docs](https://microsoft.github.io/devicescript/developer/cloud/gateway)."
             }
         ],
         "walkthroughs": [
@@ -274,9 +300,9 @@
         "menus": {
             "editor/title": [
                 {
-                    "command": "extension.devicescript.editor.build",
-                    "when": "!inDebugMode && resourceLangId == typescript && resourceDirname in extension.devicescript.supportedFolders",
-                    "group": "navigation@1"
+                    "command": "extension.devicescript.openSimulators",
+                    "when": "resourceLangId == typescript && resourceDirname in extension.devicescript.supportedFolders",
+                    "group": "navigation"
                 },
                 {
                     "command": "extension.devicescript.editor.configure",
@@ -294,28 +320,37 @@
                     "command": "extension.devicescript.editor.run",
                     "when": "!inDebugMode && resourceLangId == typescript && resourceDirname in extension.devicescript.supportedFolders",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "extension.devicescript.editor.build",
+                    "when": "!inDebugMode && resourceLangId == typescript && resourceDirname in extension.devicescript.supportedFolders",
+                    "group": "navigation@3"
                 }
             ],
             "view/title": [
                 {
+                    "command": "extension.devicescript.project.new",
+                    "when": "!inDebugMode && view == extension.devicescript.jdom",
+                    "group": "navigation",
+                    "order": 2
+                },
+                {
                     "command": "extension.devicescript.connect",
-                    "when": "view == extension.devicescript.jdom",
-                    "group": "navigation"
-                },
-                {
-                    "command": "extension.devicescript.openSimulators",
-                    "when": "view == extension.devicescript.jdom",
-                    "group": "navigation"
-                },
-                {
-                    "command": "extension.devicescript.terminal.show",
-                    "when": "view == extension.devicescript.jdom",
+                    "when": "!inDebugMode && view == extension.devicescript.jdom",
                     "group": "navigation"
                 },
                 {
                     "command": "extension.devicescript.data.download",
-                    "when": "view == extension.devicescript.jdom",
+                    "when": "view == extension.devicescript.jdom && extension.devicescript.console.data",
                     "group": "navigation"
+                },
+                {
+                    "command": "extension.devicescript.device.flash",
+                    "when": "!inDebugMode && view == extension.devicescript.jdom"
+                },
+                {
+                    "command": "extension.devicescript.device.clean",
+                    "when": "!inDebugMode && view == extension.devicescript.jdom"
                 },
                 {
                     "command": "extension.devicescript.watch.clear",
@@ -381,7 +416,12 @@
                     "group": "inline"
                 },
                 {
-                    "command": "extension.devicescript.jdom.devicescript.toggle",
+                    "command": "extension.devicescript.jdom.devicescript.start",
+                    "when": "view == extension.devicescript.jdom && viewItem == devs_devicescript",
+                    "group": "inline"
+                },
+                {
+                    "command": "extension.devicescript.jdom.devicescript.stop",
                     "when": "view == extension.devicescript.jdom && viewItem == devs_devicescript",
                     "group": "inline"
                 },
@@ -398,6 +438,11 @@
                 {
                     "command": "extension.devicescript.jdom.wifi.ap.setPriority",
                     "when": "view == extension.devicescript.jdom && viewItem == devs_wifi_ap_known"
+                },
+                {
+                    "command": "extension.devicescript.jdom.settings.clear",
+                    "when": "view == extension.devicescript.jdom && viewItem == devs_settings",
+                    "group": "inline"
                 },
                 {
                     "command": "extension.devicescript.watch.add",
@@ -491,6 +536,10 @@
                     "when": "workbenchState != empty"
                 },
                 {
+                    "command": "extension.devicescript.device.clean",
+                    "when": "workbenchState != empty"
+                },
+                {
                     "command": "extension.devicescript.simulator.start",
                     "when": "workbenchState != empty"
                 },
@@ -511,6 +560,14 @@
                     "when": "workbenchState != empty"
                 },
                 {
+                    "command": "extension.devicescript.settings.add",
+                    "when": "workbenchState != empty"
+                },
+                {
+                    "command": "extension.devicescript.npm",
+                    "when": "workbenchState != empty"
+                },
+                {
                     "command": "extension.devicescript.services.add",
                     "when": "workbenchState != empty"
                 },
@@ -526,6 +583,12 @@
                 },
                 {
                     "command": "extension.devicescript.project.new"
+                },
+                {
+                    "command": "extension.devicescript.project.upgrade"
+                },
+                {
+                    "command": "extension.devicescript.openIssueReporter"
                 }
             ],
             "debug/variables/context": [
@@ -539,6 +602,12 @@
             {
                 "command": "extension.devicescript.project.new",
                 "title": "Create New Project...",
+                "category": "DeviceScript",
+                "icon": "$(add)"
+            },
+            {
+                "command": "extension.devicescript.project.upgrade",
+                "title": "Upgrade Tools...",
                 "category": "DeviceScript"
             },
             {
@@ -601,8 +670,29 @@
                 "category": "DeviceScript"
             },
             {
+                "command": "extension.devicescript.device.clean",
+                "title": "Clean Flash...",
+                "category": "DeviceScript"
+            },
+            {
                 "command": "extension.devicescript.sims.add",
                 "title": "Add Sim...",
+                "category": "DeviceScript"
+            },
+            {
+                "command": "extension.devicescript.jdom.settings.clear",
+                "title": "Clear Device Settings...",
+                "category": "DeviceScript",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "extension.devicescript.npm",
+                "title": "Add npm...",
+                "category": "DeviceScript"
+            },
+            {
+                "command": "extension.devicescript.settings.add",
+                "title": "Add Device Settings...",
                 "category": "DeviceScript"
             },
             {
@@ -663,10 +753,16 @@
                 "icon": "$(refresh)"
             },
             {
-                "command": "extension.devicescript.jdom.devicescript.toggle",
-                "title": "Start/Stop",
+                "command": "extension.devicescript.jdom.devicescript.start",
+                "title": "Restart",
                 "category": "DeviceScript",
-                "icon": "$(refresh)"
+                "icon": "$(debug-start)"
+            },
+            {
+                "command": "extension.devicescript.jdom.devicescript.stop",
+                "title": "Stop",
+                "category": "DeviceScript",
+                "icon": "$(debug-stop)"
             },
             {
                 "command": "extension.devicescript.jdom.wifi.ap.add",
@@ -733,6 +829,11 @@
             {
                 "command": "extension.devicescript.device.showFirmwareInformation",
                 "title": "Update Firmware",
+                "category": "DeviceScript"
+            },
+            {
+                "command": "extension.devicescript.openIssueReporter",
+                "title": "Report Issue...",
                 "category": "DeviceScript"
             },
             {

@@ -1,3 +1,11 @@
+Array.prototype.at = function (index) {
+    if (index < 0) {
+        const length = this.length
+        return this[length + index]
+    }
+    return this[index]
+}
+
 Array.prototype.map = function (f) {
     const res: any[] = []
     const length = this.length
@@ -22,6 +30,49 @@ Array.prototype.find = function (f) {
     return undefined
 }
 
+Array.prototype.findIndex = function (f) {
+    const length = this.length
+    for (let i = 0; i < length; ++i) {
+        if (f(this[i], i, this)) return i
+    }
+    return -1
+}
+
+Array.prototype.findLast = function (f) {
+    const length = this.length
+    for (let i = length - 1; i >= 0; i--) {
+        if (f(this[i], i, this)) return this[i]
+    }
+    return undefined
+}
+
+Array.prototype.findLastIndex = function (f) {
+    const length = this.length
+    for (let i = length - 1; i >= 0; i--) {
+        if (f(this[i], i, this)) return i
+    }
+    return -1
+}
+
+Array.prototype.with = function <T>(index: number, value: T): T[] {
+    if (isNaN(index) || typeof index !== "number") {
+        throw new TypeError("Index must be a number")
+    }
+
+    if (index < -this.length || index >= this.length) {
+        throw new RangeError("Index out of bounds")
+    }
+
+    if (index < 0) {
+        index = this.length + index
+    }
+
+    const newArray = [...this]
+    newArray[index] = value
+
+    return newArray
+}
+
 Array.prototype.filter = function (f) {
     const res: any[] = []
     const length = this.length
@@ -37,6 +88,37 @@ Array.prototype.every = function (f) {
         if (!f(this[i], i, this)) return false
     }
     return true
+}
+
+Array.prototype.fill = function (value, start, end) {
+    const length = this.length
+    let startIndex = start ?? 0
+    if (startIndex < -length) {
+        startIndex = 0
+    }
+
+    if (startIndex < 0) {
+        startIndex = startIndex + length
+    }
+
+    let endIndex = end ?? length
+    if (endIndex >= length) {
+        endIndex = length
+    }
+
+    if (endIndex < 0) {
+        endIndex = endIndex + length
+    }
+
+    if (endIndex < -length) {
+        endIndex = 0
+    }
+
+    for (let i = startIndex; i < endIndex; ++i) {
+        this[i] = value
+    }
+
+    return this
 }
 
 Array.prototype.some = function (f) {
@@ -104,6 +186,51 @@ Array.prototype.reduce = function (callbackfn: any, initialValue: any) {
     return initialValue
 }
 
+Array.prototype.sort = function <T>(compareFn?: (a: T, b: T) => number) {
+    if (!compareFn) {
+        compareFn = (a: any, b: any) => {
+            a = a + ""
+            b = b + ""
+            if (a < b) return -1
+            else if (a > b) return 1
+            else return 0
+        }
+    }
+
+    for (let i = 1; i < this.length; i++) {
+        const current = this[i]
+        let j = i - 1
+        while (j >= 0 && compareFn(this[j], current) > 0) {
+            this[j + 1] = this[j]
+            j--
+        }
+        this[j + 1] = current
+    }
+
+    return this
+}
+
+Array.prototype.keys = function () {
+    console.log ('KEYS', this.length);
+    return Array(this.length).fill(0).map((_, i) => i);
+}
+
+Array.prototype.reverse = function () {
+    const len = this.length;
+    const middle = Math.floor(len / 2);
+    let lower = 0;
+
+    while (lower !== middle) {
+        const upper = len - lower - 1;
+        const lowerValue = this[lower];
+        this[lower] = this[upper];
+        this[upper] = lowerValue;
+        lower++;
+    }
+    return this;
+}
+
+
 Buffer.prototype.set = function (other: Buffer, trgOff?: number) {
     if (!trgOff) trgOff = 0
     this.blitAt(trgOff, other, 0, other.length)
@@ -120,9 +247,27 @@ Buffer.prototype.slice = function (start?: number, end?: number) {
     if (end === undefined) end = this.length
     if (start === undefined) start = 0
     const len = end - start
-    if (len <= 0 || start >= this.length)
-        return Buffer.alloc(0)
+    if (len <= 0 || start >= this.length) return Buffer.alloc(0)
     const r = Buffer.alloc(len)
     r.blitAt(0, this, start, len)
     return r
+}
+
+Buffer.concat = function (...buffers: Buffer[]) {
+    let size = 0
+    for (const b of buffers) {
+        size += b.length
+    }
+    const r = Buffer.alloc(size)
+    size = 0
+    for (const b of buffers) {
+        r.blitAt(size, b, 0, b.length)
+        size += b.length
+    }
+    return r
+}
+
+Buffer.prototype.lastIndexOf = function (byte, startOffset, endOffset) {
+    if (endOffset == undefined) endOffset = this.length
+    return this.indexOf(byte, startOffset, -endOffset)
 }

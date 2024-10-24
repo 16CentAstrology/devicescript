@@ -3,21 +3,28 @@ const WebSocket = require("faye-websocket")
 import http from "http"
 import url from "url"
 import net from "net"
-import { error, log } from "./command"
+import { error, isInteractive, log, setInteractive } from "./command"
 import { watch } from "fs-extra"
 import { resolveBuildConfig, SrcFile } from "@devicescript/compiler"
 import {
     bufferConcat,
     debounce,
     delay,
+    DEVICE_ANNOUNCE,
+    DeviceScriptManagerReg,
     ERROR,
     Flags,
     FRAME_PROCESS,
+    FRAME_PROCESS_LARGE,
     JDBus,
+    JDDevice,
     JDFrameBuffer,
     loadServiceSpecifications,
     serializeToTrace,
     SRV_DEVICE_SCRIPT_MANAGER,
+    SRV_SETTINGS,
+    Transport,
+    TRANSPORT_ERROR,
 } from "jacdac-ts"
 import { deployToService } from "./deploy"
 import { open, readFile } from "fs/promises"
@@ -76,6 +83,15 @@ function loadProjectServiceSpecifications() {
         )
 }
 
+function transportError(ev: {
+    transport: Transport
+    context: string
+    exception: any
+}) {
+    error(`${ev.transport.type} error: ${ev.exception?.message || ev.context}`)
+    if (ev.exception && Flags.diagnostics) console.debug(ev.exception)
+}
+
 export async function devtools(
     fn: string | undefined,
     options: DevToolsOptions & BuildOptions & TransportsOptions = {}
@@ -84,6 +100,7 @@ export async function devtools(
     const tcpPort = 8082
     const dbgPort = 8083
 
+    if (options.vscode) setInteractive(false) // don't prompt for anything
     if (options.diagnostics) Flags.diagnostics = true
 
     overrideConsoleDebug()
@@ -95,7 +112,7 @@ export async function devtools(
     const traceFd = options.trace ? await open(options.trace, "w") : null
 
     // passive bus to sniff packets
-    const transports = createTransports(options)
+    const transports = await createTransports(options)
     const bus = new JDBus(transports, {
         client: false,
         disableRoleManager: true,
@@ -118,6 +135,7 @@ export async function devtools(
 
     bus.passive = false
     bus.on(ERROR, e => error(e))
+    bus.on(TRANSPORT_ERROR, transportError)
     bus.on(FRAME_PROCESS, (frame: JDFrameBuffer) => {
         if (traceFd)
             traceFd.write(
@@ -127,11 +145,17 @@ export async function devtools(
             .filter(c => c.__devsSender !== frame._jacdac_sender)
             .forEach(c => c.send(Buffer.from(frame)))
     })
+    bus.on(FRAME_PROCESS_LARGE, (frame: JDFrameBuffer) => {
+        devtoolsSelf.clients
+            .filter(c => c.__devsSender !== frame._jacdac_sender)
+            .forEach(c => c.send(Buffer.from(frame)))
+    })
 
     startProxyServers(port, tcpPort, options)
     startDbgServer(dbgPort, options)
 
     enableLogging(bus)
+    if (options.vscode) disableAutoStart(bus)
 
     bus.autoConnect = true
     bus.start()
@@ -162,24 +186,45 @@ export async function devtools(
     }
 }
 
+export const DISABLE_AUTO_START_KEY = "disableAutoStart"
+function disableAutoStart(bus: JDBus) {
+    bus.nodeData[DISABLE_AUTO_START_KEY] = true // settings might fiddle with this flag
+    bus.on(DEVICE_ANNOUNCE, async (dev: JDDevice) => {
+        // when a device manager connects, disable auto start
+        const managers = dev.services({
+            serviceClass: SRV_DEVICE_SCRIPT_MANAGER,
+        })
+        for (const manager of managers) {
+            console.debug(`disable autostart of ${manager}`)
+            const autoStart = manager.register(DeviceScriptManagerReg.Autostart)
+            await autoStart.sendSetBoolAsync(false)
+        }
+    })
+}
+
 function startProxyServers(
     port: number,
     tcpPort: number,
     options: DevToolsOptions
 ) {
     let clientId = 0
-
+    const { vscode } = options
     const bus = devtoolsSelf.bus
 
     const listenHost = options.internet ? undefined : "127.0.0.1"
     const domain = listenHost || "localhost"
-    log(`   http     : http://${domain}:${port}`)
-    log(`   websocket: ws://${domain}:${port}`)
+    log(`   dashboard  : http://${domain}:${port}/`)
+    log(`   connection : http://${domain}:${port}/connect`)
+    log(`   websocket  : ws://${domain}:${port}`)
     const server = http.createServer(function (req, res) {
         const parsedUrl = url.parse(req.url)
         const pathname = parsedUrl.pathname
-        if (pathname === "/") {
-            fetchDevToolsProxy(options.localhost, options.vscode)
+        let route: "vscode" | "connect" | "dashboard"
+        if (pathname === "/") route = vscode ? "vscode" : "dashboard"
+        else if (pathname === "/connect") route = "connect"
+        if (!route) res.statusCode = 404
+        else
+            fetchDevToolsProxy(options.localhost, route)
                 .then(proxyHtml => {
                     res.setHeader("Cache-control", "no-cache")
                     res.setHeader("Content-type", "text/html")
@@ -189,9 +234,6 @@ function startProxyServers(
                     error(e)
                     res.statusCode = 3
                 })
-        } else {
-            res.statusCode = 404
-        }
     })
     server.on("error", handleError)
     server.on("upgrade", (request, socket, body) => {
@@ -218,7 +260,7 @@ function startProxyServers(
     })
     server.listen(port, listenHost)
 
-    log(`   tcpsocket: tcp://${domain}:${tcpPort}`)
+    log(`   tcpsocket  : tcp://${domain}:${tcpPort}`)
     const tcpServer = net.createServer(socket => {
         const sender = "tcp" + ++clientId
         const client: DevToolsClient = socket as any
@@ -226,6 +268,7 @@ function startProxyServers(
         client.send = (pkt0: Buffer | string) => {
             if (typeof pkt0 == "string") return
             if (socket.readyState !== "open") return
+            if (pkt0.length >= 0xff) return
             const pkt = new Uint8Array(pkt0)
             const b = new Uint8Array(1 + pkt.length)
             b[0] = pkt.length
@@ -251,9 +294,14 @@ function startProxyServers(
                 buf = new Uint8Array(buf)
             }
             while (buf) {
-                const endp = buf[0] + 1
+                let endp = buf[0] + 1
+                let off = 1
+                if (endp == 0x100 && buf.length > 3) {
+                    endp = 3 + buf[1] + (buf[2] << 8)
+                    off = 3
+                }
                 if (buf.length >= endp) {
-                    const pkt = buf.slice(1, endp)
+                    const pkt = buf.slice(off, endp)
                     if (buf.length > endp) buf = buf.slice(endp)
                     else buf = null
                     processPacket(pkt, sender)
@@ -316,7 +364,7 @@ function startDbgServer(port: number, options: DevToolsOptions) {
 
     const listenHost = options.internet ? undefined : "127.0.0.1"
     const domain = listenHost || "localhost"
-    console.log(`   dbgserver: tcp://${domain}:${port}`)
+    console.log(`   dbgserver  : tcp://${domain}:${port}`)
     net.createServer(async socket => {
         console.log("dbgserver: connection")
         let session: DsDapSession
@@ -340,7 +388,7 @@ function startDbgServer(port: number, options: DevToolsOptions) {
 }
 
 async function connectCmd(req: ConnectReqArgs) {
-    await connectTransport(devtoolsSelf.bus, req)
+    await connectTransport(devtoolsSelf, req)
 }
 
 async function buildCmd(args: BuildReqArgs) {
@@ -388,9 +436,16 @@ async function rebuild(args: BuildReqArgs) {
     let deployStatus = ""
     if (args.deployTo && res.success) {
         const binary = res.binary
+        const settings = res.settings
         try {
             const service = deployService(args)
-            await deployToService(service, binary)
+            const settingsService = service?.device?.services({
+                serviceClass: SRV_SETTINGS,
+            })?.[0]
+            await deployToService(service, binary, {
+                settingsService,
+                settings,
+            })
             deployStatus = `OK`
         } catch (err) {
             deployStatus = err.message || "" + err
@@ -418,10 +473,9 @@ function deployService(args: BuildReqArgs) {
             lost: false,
         })
         if (services.length > 1)
-            throw new Error(`Multiple DeviceScript Managers found.`)
+            throw new Error(`Multiple DeviceScript device found.`)
         else if (services.length == 0)
-            throw new Error(`No DeviceScript Managers found.`)
-
+            throw new Error(`No DeviceScript device found.`)
         return services[0]
     }
 

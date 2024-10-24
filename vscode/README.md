@@ -1,6 +1,6 @@
 # DeviceScript
 
-**Professional TypeScript-like developer experience for low-resource microcontroller-based devices.**
+**TypeScript developer experience for low-resource microcontroller-based devices.**
 DeviceScript is compiled to a custom VM bytecode, which can run in very constrained
 environments.
 
@@ -16,8 +16,11 @@ environments.
 -   DeviceScript simulator
 -   Sensor and Jacdac simulator
 -   Connection to native DeviceScript device
+-   Remote workspace support
 -   Device, services, register Explorer view
 -   Register and Event watch
+
+> **If you fancy building your own tiny DOM/UI framework, this is your chance!** We have a limited implementation of [CanvasRenderingContext2D](https://microsoft.github.io/devicescript/developer/graphics) for LCD/OLED/eInk screens (like SSD1306, ST7735, UC8151) that you can use to display a UI. Limited memory, limited pixels, limited battery, it's a great challenge ([discussion](https://github.com/microsoft/devicescript/discussions/485))! We have TSX support to build a React like framework as well.
 
 ## Telemetry
 

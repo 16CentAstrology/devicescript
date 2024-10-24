@@ -33,6 +33,7 @@ typedef struct devs_activation devs_activation_t;
 #define DEVS_PKT_KIND_SEND_PKT 2
 #define DEVS_PKT_KIND_SEND_RAW_PKT 3
 #define DEVS_PKT_KIND_SUSPENDED 4
+#define DEVS_PKT_KIND_AWAITING 5
 
 typedef void (*devs_resume_cb_t)(devs_ctx_t *ctx, void *userdata);
 
@@ -49,6 +50,7 @@ typedef struct devs_fiber {
             uint16_t resend_timeout;
         } reg_get;
         value_t v;
+        uint8_t *awaiting;
     } pkt_data;
 
     uint8_t pkt_kind : 4;
@@ -140,6 +142,7 @@ struct devs_ctx {
     uint8_t dbg_en;
     uint8_t ignore_brk;
     uint8_t dbg_flags;
+    uint8_t num_pins;
     uint16_t num_roles;
 
     uint32_t literal_int;
@@ -166,10 +169,18 @@ struct devs_ctx {
     uint32_t _logged_now;
 
     uint32_t fiber_handle_tag;
+    uint32_t send_pkt_throttle;
+
+    uint32_t num_throttled_pkts;
+    uint32_t last_warning;
+
+    uint32_t ctx_seq_no;
 
     devs_gc_t *gc;
 
     devs_cfg_t cfg;
+
+    struct devs_pin_state *pin_state;
 
     devs_activation_t *step_fn;
     devs_brk_t *brk_list;
@@ -195,6 +206,15 @@ struct devs_activation {
     const devs_function_desc_t *func;
     value_t slots[0];
 };
+
+typedef struct devs_pin_state {
+    value_t obj;
+    const char *label;
+    uint8_t id;
+    uint8_t gpio;
+    uint8_t mode;
+    uint16_t capabilities;
+} devs_pin_state_t;
 
 static inline uint32_t devs_now(devs_ctx_t *ctx) {
     return (uint32_t)ctx->_now_long;
@@ -247,6 +267,8 @@ void devs_fiber_set_wake_time(devs_fiber_t *fiber, unsigned time);
 void devs_fiber_sleep(devs_fiber_t *fiber, unsigned time);
 void devs_fiber_termiante(devs_fiber_t *fiber);
 void devs_fiber_yield(devs_ctx_t *ctx);
+void devs_fiber_await(devs_fiber_t *fib, uint8_t *awaiting);
+void devs_fiber_await_done(uint8_t *awaiting);
 // if `args` is passed, `numparams==0`
 // otherwise, `numparams` arguments are sought on the_stack
 int devs_fiber_call_function(devs_fiber_t *fiber, unsigned numparams, devs_array_t *args);
@@ -262,6 +284,7 @@ unsigned devs_fiber_get_max_sleep(devs_ctx_t *ctx);
 
 // vm_main.c
 void devs_vm_exec_opcodes(devs_ctx_t *ctx);
+bool devs_in_vm_loop(devs_ctx_t *ctx);
 uint8_t devs_fetch_opcode(devs_activation_t *frame, devs_ctx_t *ctx);
 
 int devs_vm_set_breakpoint(devs_ctx_t *ctx, unsigned pc, unsigned flags);
@@ -293,7 +316,9 @@ devs_map_t *devs_get_spec_proto(devs_ctx_t *ctx, uint32_t spec_idx);
 #define TODO JD_PANIC
 
 // for impl_*.c
+bool devs_arg_bool(devs_ctx_t *ctx, unsigned idx);
 int32_t devs_arg_int(devs_ctx_t *ctx, unsigned idx);
+int32_t devs_arg_int_defl(devs_ctx_t *ctx, unsigned idx, int32_t defl);
 double devs_arg_double(devs_ctx_t *ctx, unsigned idx);
 const char *devs_arg_utf8_with_conv(devs_ctx_t *ctx, unsigned idx, unsigned *sz);
 static inline value_t devs_arg(devs_ctx_t *ctx, unsigned idx) {
@@ -309,13 +334,16 @@ void devs_ret_int(devs_ctx_t *ctx, int v);
 void devs_ret_bool(devs_ctx_t *ctx, bool v);
 void devs_ret_gc_ptr(devs_ctx_t *ctx, void *v);
 static inline void devs_ret(devs_ctx_t *ctx, value_t v) {
-    ctx->curr_fiber->ret_val = v;
+    // curr_fiber might be reset by panic; we don't want to crash
+    if (ctx->curr_fiber)
+        ctx->curr_fiber->ret_val = v;
 }
 
 static inline bool devs_did_yield(devs_ctx_t *ctx) {
     return ctx->curr_fiber == NULL;
 }
 void devs_setup_resume(devs_fiber_t *f, devs_resume_cb_t cb, void *userdata);
+int devs_clamp_size(int v, int max);
 
 static inline devs_role_t *devs_role(devs_ctx_t *ctx, unsigned roleidx) {
     if (roleidx < ctx->num_roles)
@@ -340,6 +368,7 @@ void devs_throw(devs_ctx_t *ctx, value_t exn, unsigned flags);
 value_t devs_throw_type_error(devs_ctx_t *ctx, const char *format, ...);
 value_t devs_throw_range_error(devs_ctx_t *ctx, const char *format, ...);
 value_t devs_throw_syntax_error(devs_ctx_t *ctx, const char *format, ...);
+value_t devs_throw_generic_error(devs_ctx_t *ctx, const char *format, ...);
 value_t devs_throw_not_supported_error(devs_ctx_t *ctx, const char *what);
 value_t devs_throw_expecting_error_ext(devs_ctx_t *ctx, const char *what, value_t v);
 value_t devs_throw_expecting_error(devs_ctx_t *ctx, unsigned builtinstr, value_t v);
@@ -352,3 +381,15 @@ const devs_function_desc_t *devs_function_by_pc(devs_ctx_t *ctx, unsigned pc);
 void devs_dump_stack(devs_ctx_t *ctx, value_t stack);
 void devs_dump_exception(devs_ctx_t *ctx, value_t exn);
 void devs_track_exception(devs_ctx_t *ctx);
+
+#define DEVS_CHECK_CTX_FREE(ctx) JD_ASSERT(!devs_in_vm_loop(ctx))
+
+#ifndef JD_LED_STRIP
+#define JD_LED_STRIP 0
+#endif
+
+// external APIs
+#if JD_LED_STRIP
+int devs_led_strip_send(devs_ctx_t *ctx, uint8_t pin, const uint8_t *data, unsigned size,
+                        cb_t donefn);
+#endif

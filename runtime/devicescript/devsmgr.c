@@ -45,7 +45,6 @@ struct srv_state {
 
     const void *program_base;
 
-    const devsmgr_cfg_t *cfg;
     devs_ctx_t *ctx;
 
     uint32_t write_offset;
@@ -211,7 +210,7 @@ void devsmgr_process(srv_t *state) {
     }
 }
 
-void devsmgr_restart() {
+void devsmgr_restart(void) {
     srv_t *state = _state;
     stop_program(state);
     state->next_restart = now + MS(50);
@@ -228,21 +227,12 @@ int devsmgr_deploy_start(uint32_t sz) {
     if (sz & (DEVSMGR_ALIGN - 1))
         return -1;
 
-#if !JD_SETTINGS_LARGE
-    if (sz >= state->cfg->max_program_size - sizeof(hd))
-        return -1;
-#endif
-
     stop_program(state);
 
     LOGV("flash erase");
-#if JD_SETTINGS_LARGE
     state->program_base = jd_settings_prep_large("*prog", sizeof(hd) + sz);
     if (state->program_base == NULL)
         return -2;
-#else
-    flash_erase((void *)state->program_base);
-#endif
     LOGV("flash erase done");
 
     if (sz == 0)
@@ -250,12 +240,8 @@ int devsmgr_deploy_start(uint32_t sz) {
 
     hd.magic0 = DEVSMGR_PROG_MAGIC0;
     hd.size = sz;
-#if JD_SETTINGS_LARGE
     jd_settings_write_large((void *)state->program_base, &hd, 8);
     jd_settings_sync_large();
-#else
-    flash_program((void *)state->program_base, &hd, 8);
-#endif
 
     // const devsmgr_program_header_t *hdf = state->program_base;
     // DMESG("sz=%u %x %x", hdf->size, hdf->magic0, hdf->magic1);
@@ -285,18 +271,12 @@ int devsmgr_deploy_write(const void *buf, unsigned size) {
             DMESG("! missing %d bytes (of %d)", (int)(endp - state->write_offset), (int)hdf->size);
             return -1;
         } else {
-#if JD_SETTINGS_LARGE
             jd_settings_write_large((void *)&hdf->magic1, &hd.magic1, sizeof(hd) - 8);
             jd_settings_sync_large();
-#else
-            flash_program((void *)&hdf->magic1, &hd.magic1, sizeof(hd) - 8);
-            flash_sync();
-#endif
             LOG("program written");
             stop_program(state);
             jd_send_event(state, JD_EV_CHANGE);
             state->next_restart = now; // make it more responsive
-            state->force_start = 1;
             return 0;
         }
     }
@@ -311,23 +291,10 @@ int devsmgr_deploy_write(const void *buf, unsigned size) {
         return -1;
     }
 
-#if !JD_SETTINGS_LARGE
-    if (state->write_offset / JD_FLASH_PAGE_SIZE !=
-        (state->write_offset + size) / JD_FLASH_PAGE_SIZE) {
-        unsigned page_off = (state->write_offset + size) & ~(JD_FLASH_PAGE_SIZE - 1);
-        LOGV("erase %p %u", dst + page_off, page_off);
-        flash_erase((void *)(dst + page_off));
-    }
-#endif
-
     dst += state->write_offset;
 
     LOGV("wr %p (%u) sz=%d", dst, (unsigned)state->write_offset, size);
-#if JD_SETTINGS_LARGE
     jd_settings_write_large((void *)dst, buf, size);
-#else
-    flash_program((void *)dst, buf, size);
-#endif
     state->write_offset += size;
 
     return 0;
@@ -486,18 +453,17 @@ static void devsmgr_client_ev(void *state0, int event_id, void *arg0, void *arg1
         devs_client_event_handler(state->ctx, event_id, arg0, arg1);
 }
 
-void devsmgr_init(const devsmgr_cfg_t *cfg) {
+void devsmgr_init(void) {
     SRV_ALLOC(devsmgr);
-    state->cfg = cfg;
-#if JD_SETTINGS_LARGE
     state->program_base = jd_settings_get_large("*prog", NULL);
-#else
-    state->program_base = cfg->program_base;
-#endif
     state->read_program_ptr = -1;
     state->autostart = 1;
-    // first start 1.5s after brain boot up - allow devices to enumerate
-    state->next_restart = now + SECONDS(1.5);
+
+    // first start 1.1s after brain boot up - allow devices to enumerate
+    // we used to have 5s delay here, in case the user program causes a crash in the runtime
+    // to give time to connect USB but this is generally not very reliable and now we have
+    // a way of erasing device flash
+    state->next_restart = now + SECONDS(1.1);
 
     JD_ASSERT(devs_verify(devs_empty_program, sizeof(devs_empty_program)) == 0);
 
@@ -507,18 +473,30 @@ void devsmgr_init(const devsmgr_cfg_t *cfg) {
     devsmgr_sync_dcfg(state);
 }
 
-void devs_service_full_init(const devsmgr_cfg_t *cfg) {
+__attribute__((weak)) bool jd_wifi_available(void) {
+    return true;
+}
+
+void devs_service_full_init(void) {
+    // set initial pin states
+    devs_gpio_init_dcfg(NULL);
+
     jd_role_manager_init();
-    devsmgr_init(cfg);
+    devsmgr_init();
     devsdbg_init();
     settings_init();
 
 #if !JD_HOSTED
-    gpiosrv_config();
+    // gpiosrv_config();
 #endif
 
 #if JD_NETWORK
-    if (dcfg_get_bool("devNetwork")) {
+#if JD_WIFI
+    if (!jd_wifi_available()) {
+        LOG("wifi not available; skipping networking");
+    } else
+#endif
+        if (dcfg_get_bool("devNetwork")) {
         LOG("devNetwork mode - disable cloud adapter");
     } else {
         LOG("starting cloud adapter");

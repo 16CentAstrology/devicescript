@@ -9,9 +9,16 @@ description: MSR JacdacIoT 48 v0.2
 ## Features
 
 -  Jacdac on pin 17 using Jacdac connector
--  I2C on SDA/SCL: 9/10 using Qwiic connector
--  RGB LED on pins 8, 7, 6
+-  I2C on 9/10 using Qwiic connector
+-  RGB LED on pins 8, 7, 6  (use [setStatusLight](/developer/status-light) to control)
+-  Serial logging on pin 43 at 115200 8N1
+
+{@import optional ./msr48-features.mdp}
+
 -  Service: power (auto-start)
+
+{@import optional ./msr48-services.mdp}
+
 
 ## Stores
 
@@ -26,20 +33,37 @@ description: MSR JacdacIoT 48 v0.2
 | **P36** |  GPIO36 |  io |
 | **RX** |  GPIO38 |  io |
 | **TX** |  GPIO37 |  io |
-| **i2c.pinSCL** |  GPIO10 |  analogIn,  io |
-| **i2c.pinSDA** |  GPIO9 |  analogIn,  io |
-| **jacdac.pin** |  GPIO17 |  analogOut,  io |
-| **led.rgb[0].pin** |  GPIO8 |  analogIn,  io |
-| **led.rgb[1].pin** |  GPIO7 |  analogIn,  io |
-| **led.rgb[2].pin** |  GPIO6 |  analogIn,  io |
-| **services.power[0].pinEn** |  GPIO2 |  analogIn,  io |
-| **services.power[0].pinFault** |  GPIO13 |  io |
+| **i2c.pinSCL** |  GPIO10 |  i2c.pinSCL,  analogIn,  io |
+| **i2c.pinSDA** |  GPIO9 |  i2c.pinSDA,  analogIn,  io |
+| **jacdac.pin** |  GPIO17 |  jacdac.pin,  analogOut,  io |
+| **led.rgb[0].pin** |  GPIO8 |  led.rgb[0].pin,  analogIn,  io |
+| **led.rgb[1].pin** |  GPIO7 |  led.rgb[1].pin,  analogIn,  io |
+| **led.rgb[2].pin** |  GPIO6 |  led.rgb[2].pin,  analogIn,  io |
+| **log.pinTX** |  GPIO43 |  log.pinTX,  io |
+| **services.power[0].pinEn** |  GPIO2 |  services.power[0].pinEn,  analogIn,  io |
+| **services.power[0].pinFault** |  GPIO13 |  services.power[0].pinFault,  io |
 
 
+
+## DeviceScript import
+
+
+You must add this import statement to load 
+the pinout configuration for this device.
+
+In [Visual Studio Code](/getting-started/vscode),
+click the **wand** icon on the file menu and 
+select "MSR JacdacIoT 48 v0.2".
+
+```ts
+import { pins, board } from "@dsboard/msr48"
+```
+
+{@import optional ./msr48-examples.mdp}
 
 ## Firmware update
 
-In [Visual Studio Code](/getting-started/vscode),
+In Visual Studio Code,
 select **DeviceScript: Flash Firmware...** from the command palette.
         
 Run this [command line](/api/cli) command and follow the instructions.
@@ -85,6 +109,9 @@ devicescript flash --board msr48
             }
         ]
     },
+    "log": {
+        "pinTX": 43
+    },
     "pins": {
         "P33": 33,
         "P34": 34,
@@ -102,7 +129,6 @@ devicescript flash --board msr48
             "pinFault": 13,
             "service": "power"
         }
-    ],
-    "uartLog": true
+    ]
 }
 ```

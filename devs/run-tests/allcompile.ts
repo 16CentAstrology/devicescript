@@ -6,6 +6,10 @@ import "@devicescript/i2c"
 import "@devicescript/settings"
 import "@devicescript/drivers"
 import "@devicescript/gpio"
+import "@devicescript/spi"
+import "@devicescript/graphics"
+import "@devicescript/crypto"
+import "@devicescript/net"
 import "@devicescript/runtime"
 
 console.log("all libraries compiled and didn't crash!")

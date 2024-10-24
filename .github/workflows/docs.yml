@@ -9,6 +9,9 @@ on:
 jobs:
     build:
         runs-on: ubuntu-latest
+        permissions: 
+            actions: read
+            contents: write        
         steps:
             - uses: actions/checkout@v3
               with:
@@ -16,7 +19,7 @@ jobs:
                   fetch-depth: 0
             - uses: actions/setup-node@v3
               with:
-                  node-version: "18"
+                  node-version: "20"
                   cache: yarn
             - run: yarn install --frozen-lockfile
             - name: Build tools

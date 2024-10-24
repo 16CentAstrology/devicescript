@@ -1,12 +1,12 @@
 import { program, CommandOptions, Command } from "commander"
 import { annotate } from "./annotate"
-import { build } from "./build"
+import { build, buildAll } from "./build"
 import { crunScript } from "./crun"
 import { ctool } from "./ctool"
 import { deployScript } from "./deploy"
 import { devtools } from "./devtools"
 import { disasm } from "./disasm"
-import { addNpm, addService, addSim, addTest, init } from "./init"
+import { addNpm, addService, addSettings, addSim, addTest, init } from "./init"
 import { logParse } from "./logparse"
 import { runScript } from "./run"
 import { compileFlagHelp } from "@devicescript/compiler"
@@ -17,6 +17,7 @@ import {
     incVerbose,
     setConsoleColors,
     setDeveloperMode,
+    setInteractive,
     setQuiet,
     verboseLog,
 } from "./command"
@@ -32,6 +33,7 @@ import {
 import { addBoard } from "./addboard"
 import { LoggerPriority } from "jacdac-ts"
 import { snippets } from "./snippets"
+import { bundle } from "./bundle"
 
 export async function mainCli() {
     await notifyUpdates({
@@ -55,8 +57,10 @@ export async function mainCli() {
                 "-F, --flag <compiler-flag>",
                 "set compiler flag",
                 (val, prev: Record<string, boolean>) => {
-                    if (!compileFlagHelp[val])
+                    if (!compileFlagHelp[val]) {
+                        showCompilerFlags()
                         throw new Error(`invalid compiler flag: '${val}'`)
+                    }
                     prev[val] = true
                     return prev
                 },
@@ -72,6 +76,10 @@ export async function mainCli() {
         .version(cliVersion())
         .option("-v, --verbose", "more logging (can be repeated)")
         .option("--quiet", "less logging")
+        .option(
+            "--ci",
+            "disable interactions with user, default is false unless CI env var is set"
+        )
         .option("--no-colors", "disable color output")
         .option("--dev", "developer mode")
 
@@ -80,18 +88,32 @@ export async function mainCli() {
         .argument("[src/mainXYZ.ts]", "entry point", "src/main.ts")
         .action(build)
 
+    buildCommand("build-all", { hidden: true })
+        .description("build all src/main*.ts files")
+        .action(buildAll)
+
     program
         .command("flags")
         .description("show description of compiler flags")
-        .action(() => {
-            function pad(s: string, n: number) {
-                while (s.length < n) s += " "
-                return s
-            }
-            for (const k of Object.keys(compileFlagHelp)) {
-                console.log(`    -F ${pad(k, 20)} ${compileFlagHelp[k]}`)
-            }
-        })
+        .action(showCompilerFlags)
+
+    function showCompilerFlags() {
+        function pad(s: string, n: number) {
+            while (s.length < n) s += " "
+            return s
+        }
+        for (const k of Object.keys(compileFlagHelp)) {
+            console.log(`    -F ${pad(k, 20)} ${compileFlagHelp[k]}`)
+        }
+    }
+
+    buildCommand("bundle")
+        .description("bundle program, settings, and runtime")
+        .option("-b, --board <board-id>", "specify board to flash")
+        .option("--flash-size <kb>", "override flash size (kilobytes)")
+        .option("--flash-file <name>", "where to save")
+        .arguments("[file.ts]")
+        .action(bundle)
 
     program
         .command("devtools")
@@ -216,6 +238,7 @@ export async function mainCli() {
         .command("disasm")
         .description("disassemble .devs binary")
         .option("-d, --detailed", "include all details")
+        .option("-D, --diff", "canonical-ize output for diffing")
         .arguments("[file.ts|file-dbg.json|file.devs]")
         .action(disasm)
 
@@ -261,7 +284,28 @@ export async function mainCli() {
         if (!arch) {
             r.option("-b, --board <board-id>", "specify board to flash")
             r.option("--once", "do not wait for the board to be connected")
+            r.option(
+                "-r, --refresh",
+                "discard cached firmware image, even if less than 24h old"
+            )
+            r.option(
+                "-C, --clean",
+                "remove all settings, user program, and firmware instead of flashing"
+            )
         }
+        r.option(
+            "--install",
+            "automatically install missing flashing utilities. For ESP32, if 'esptool' is missing, run `py -m pip install esptool`"
+        )
+        r.option("--python <path>", "path to the python executable")
+        r.option(
+            "--remote",
+            "flashing from a remote workspace, with no access to serial or usb"
+        )
+        r.option(
+            "--file <bin-or-uf2-file>",
+            "file to flash instead of downloaded firmware"
+        )
         r.addHelpText("after", () => {
             setupFlashBoards()
             return `\nAvailable boards:\n` + boardNames(arch)
@@ -291,6 +335,7 @@ export async function mainCli() {
         return base
             .command(name)
             .option("-f, --force", "force overwrite existing files")
+            .option("-y, --yarn", "use yarn, not npm")
             .option(
                 "--spaces <number>",
                 "number of spaces when generating JSON"
@@ -307,6 +352,7 @@ export async function mainCli() {
 
     addCommand("init", program)
         .argument("[dir]", "path to create or update project", "./")
+        .option("-b, --board <board-id>", "board ID")
         .description("creates or configures a devicescript project")
         .action(dropReturn(init))
 
@@ -333,13 +379,18 @@ export async function mainCli() {
             "-n, --name <service-name>",
             "name of new service (required, example 'Light Level')"
         )
-        .description("add a custom Jacdac service")
+        .description("add a custom service")
         .action(dropReturn(addService))
 
     addCommand("npm")
         .option("--license <string>", "set the license", "MIT")
-        .description("make current project into an NPM library")
+        .option("--name <string>", "set the project name")
+        .description("make current project into an NPM package")
         .action(dropReturn(addNpm))
+
+    addCommand("settings")
+        .description("add .env files to store settings and secrets")
+        .action(dropReturn(addSettings))
 
     addCommand("test")
         .description("add tests to current project")
@@ -377,12 +428,14 @@ export async function mainCli() {
             "--generic",
             "copy the uf2/bin file and corresponding ELF file as 'generic' variant"
         )
+        .option("--fake", "only generate info.json files")
         .option("--slug <string>", "repo slug (eg. microsoft/devicescript)")
         .option("--elf <file.elf>", "specify ELF file name")
         .arguments("<file.board.json...>")
         .action(binPatch)
 
     program.on("option:quiet", () => setQuiet(true))
+    program.on("option:ci", () => setInteractive(false))
     program.on("option:verbose", incVerbose)
     program.on("option:no-colors", () => setConsoleColors(false))
     program.on("option:dev", () => {

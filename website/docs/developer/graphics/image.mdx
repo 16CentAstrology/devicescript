@@ -1,0 +1,48 @@
+---
+sidebar_position: 1
+title: Image
+---
+
+# Image
+
+The `Image` represents a space-optimized pateletted image, with either 1 or 4 bit per pixels.
+
+## `img`
+
+`img` is a [template literal](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals) that allows defining images in form of ASCII Art.
+The compiler will automatically generate an image, stored efficiently in flash memory.
+This image is initially readonly; if you modify it, the runtime will internally allocate a buffer in RAM for it.
+
+The image format is the grid of pixels with either `.` or the palette color index (`#` treated as 1).
+
+```ts
+import { img } from "@devicescript/graphics"
+
+const i = img`
+    . . . 4 . . . . . .
+    . 2 2 2 2 2 . . . .
+    . 2 7 7 . 2 . . . .
+    . 2 7 7 . 2 . . . .
+    . 2 . . . 2 . . . .
+    . 2 2 2 2 2 . . . .
+    . . . . . . . . . .`
+```
+
+:::tip
+
+You can use the [MakeCode Arcade](https://arcade.makecode.com/#pub:40169-42646-95097-89627) sprite editor to create images and copy them back to DeviceScript!
+
+:::
+
+## Rendering context
+
+You can create a rendering context for an image; that provides a HTML canvas-like API (smaller subset).
+
+```ts
+import { Image } from "@devicescript/graphics"
+
+const img = Image.alloc(128, 64, 1)
+const ctx = img.allocContext()
+
+ctx.fillText(":)", 0, 0)
+```

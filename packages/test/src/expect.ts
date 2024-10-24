@@ -4,7 +4,10 @@ export function expect<T>(value: T) {
     return new Expect(value, false)
 }
 export class Expect<T> {
-    constructor(readonly value: T, private readonly _not: boolean) {}
+    constructor(
+        readonly value: T,
+        private readonly _not: boolean
+    ) {}
 
     private check(condition: boolean) {
         return this._not ? !condition : condition
@@ -15,10 +18,14 @@ export class Expect<T> {
     }
 
     toThrow() {
+        if (typeof this.value !== "function")
+            throw new AssertionError("toThrow", "Expected function")
         try {
             ;(this.value as any)()
-            throw new AssertionError("toThrow", "Expected to throw")
-        } catch (e) {}
+        } catch (e) {
+            return
+        }
+        throw new AssertionError("toThrow", "Expected to throw")
     }
 
     toBe(other: T): void {

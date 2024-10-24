@@ -1,5 +1,13 @@
 ---
 sidebar_position: 2
+description: Learn how to set up and use the DeviceScript command line tool for
+    creating and managing projects, and improve your development workflow.
+keywords:
+    - DeviceScript
+    - command line
+    - CLI
+    - project setup
+    - development workflow
 ---
 
 # Command Line
@@ -12,7 +20,7 @@ in Docker, GitHub Codespaces, ...
 Let's get started by installing the [DeviceScript command line](/api/cli) and create an empty project
 
 -   Open a terminal in a new folder
--   install [Node.js 18+](https://nodejs.org/en/download/) if not already installed
+-   install [Node.js 16+](https://nodejs.org/en/download/) if not already installed
 -   Use the `init` command to setup a new project
 
 ```bash
@@ -23,7 +31,7 @@ You will have the following files created.
 
 ```
 .devicescript/     reserved folder for devicescript generated files
-package.json       projet configuration
+package.json       project configuration
 devsconfig.json    configure the DeviceScript compiler with additional flags,
                    also used by VSCode extension to activate.
 src/               directory for DeviceScript sources
@@ -76,11 +84,23 @@ to a developer tools page similar to the one hosted in the docs.
 -   open the developer tools page, typically http://localhost:8081/ (see cli output)
 -   use te developer tools page similarly to the embedded docs page
 
+### Native transports
+
+If you are working on the OS directly connected to the hardware device,
+you can use start a native transport (serial, usb) from the command line.
+However, native transport typically require native npm module that might not be compatible
+with your operating system. The command line tool will detect missing dependencies
+and prompt you to install them.
+
+```bash
+devs devtools --serial src/main.ts
+```
+
 ## Edit, deploy, debug loop
 
 From here, your developer inner loop will be very similar to building/debugging a web site with hot reload.
 
 -   make an edit in your source file, say `src/main.ts`
 -   after a couple seconds, the compiler picks up the changes, produces a new bytecode and sends it to the developer tools
--   the developer tools automatically deploy thew bytecode to the select device (by default the simulator)
+-   the developer tools automatically deploy the bytecode to the selected device (by default the simulator)
 -   switch from VS Code to the browser and debug your new code

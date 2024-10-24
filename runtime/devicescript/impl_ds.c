@@ -28,6 +28,10 @@ void fun1_DeviceScript_delay(devs_ctx_t *ctx) {
 
 void fun1_DeviceScript__panic(devs_ctx_t *ctx) {
     unsigned code = devs_arg_int(ctx, 0);
+    if (code == 0xab04711) {
+        DMESG("! User-requested JD_PANIC()");
+        JD_PANIC();
+    }
     if (code == 0 || code >= 60000)
         code = 59999;
     devs_panic(ctx, code);
@@ -142,6 +146,17 @@ void fun2_DeviceScript__serverSend(devs_ctx_t *ctx) {
     if (pkt == NULL)
         return;
 
+    if (service_idx == 0x100) {
+        static uint8_t event_cnt;
+        ++event_cnt;
+        if ((pkt->service_command & ~JD_CMD_EVENT_CODE_MASK) != JD_CMD_EVENT_MASK)
+            devs_throw_expecting_error(ctx, DEVS_BUILTIN_STRING_EVENT, devs_arg(ctx, 1));
+        else
+            pkt->service_command |= (event_cnt & JD_CMD_EVENT_COUNTER_MASK)
+                                    << JD_CMD_EVENT_COUNTER_SHIFT;
+        return;
+    }
+
     if (service_idx > 0x30) {
         devs_throw_too_big_error(ctx, DEVS_BUILTIN_STRING_SERVICEINDEX);
         return;
@@ -191,4 +206,30 @@ void fun2_DeviceScript__allocRole(devs_ctx_t *ctx) {
     if (r < 0)
         return; // OOM
     devs_ret(ctx, devs_value_from_handle(DEVS_HANDLE_TYPE_ROLE, r));
+}
+
+void fun0_DeviceScript_notImplemented(devs_ctx_t *ctx) {
+    devs_throw_generic_error(ctx, "body missing");
+}
+
+__attribute__((weak)) void devs_send_large_frame(const void *data, unsigned size) {}
+
+void fun2_DeviceScript__twinMessage(devs_ctx_t *ctx) {
+    unsigned topic_size, data_size;
+    const void *topic = devs_string_get_utf8(ctx, devs_arg(ctx, 0), &topic_size);
+    const void *data = devs_bufferish_data(ctx, devs_arg(ctx, 1), &data_size);
+    if (topic == NULL || data == NULL) {
+        devs_throw_type_error(ctx, "expecting topic and data");
+        return;
+    }
+    devs_buffer_t *buf = devs_buffer_try_alloc(ctx, 4 + 4 + 8 + topic_size + 1 + data_size);
+    if (buf == NULL)
+        return;
+    devs_ret_gc_ptr(ctx, buf);
+    buf->data[2] = 0xff;
+    uint64_t id = devs_jd_server_device_id();
+    memcpy(buf->data + 8, &id, 8);
+    memcpy(buf->data + 16, topic, topic_size);
+    memcpy(buf->data + 16 + topic_size + 1, data, data_size);
+    devs_send_large_frame(buf->data, buf->length);
 }

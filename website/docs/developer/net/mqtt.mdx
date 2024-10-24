@@ -1,0 +1,83 @@
+# MQTT client
+
+The `startMQTTClient` function connects to a MQTT broker using TCP or TLS.
+
+```ts
+import { startMQTTClient } from "@devicescript/net"
+
+const mqtt = await startMQTTClient({
+    host: "broker.hivemq.com",
+    proto: "tcp",
+    port: 1883,
+})
+```
+
+:::tip
+
+You can use [HiveMQ public broker](https://www.hivemq.com/public-mqtt-broker/) for testing
+with public data.
+
+:::
+
+## publish
+
+The `publish` function sends a message on a topic.
+
+```ts
+import { startMQTTClient } from "@devicescript/net"
+
+const mqtt = await startMQTTClient({
+    host: "broker.hivemq.com",
+    proto: "tcp",
+    port: 1883,
+})
+// highlight-next-line
+await mqtt.publish("devs/log", "hello")
+```
+
+### deviceIdentifier
+
+You can use `deviceIdentifier` to uniquely identify the device
+in the topic
+
+```ts
+import { deviceIdentifier } from "@devicescript/core"
+import { startMQTTClient } from "@devicescript/net"
+
+const mqtt = await startMQTTClient({
+    host: "broker.hivemq.com",
+    proto: "tcp",
+    port: 1883,
+})
+// highlight-next-line
+const id = deviceIdentifier("self")
+await mqtt.publish(`devs/log/${id}`, "hello")
+```
+
+## subscribe
+
+The `subscribe` function creates a subscription for a topic route.
+The function takes an optional handler and returns an [observable](/developer/observables).
+
+```ts
+import { startMQTTClient } from "@devicescript/net"
+const mqtt = await startMQTTClient({
+    host: "broker.hivemq.com",
+    proto: "tcp",
+    port: 1883,
+})
+
+// highlight-next-line
+await mqtt.subscribe(`devs/log/#`, msg => {
+    console.log(msg.content.toString("utf-8"))
+})
+```
+
+## stop
+
+The MQTT client will automatically retry to connect once it detects that connectivity is lost.
+To close the current socket and stop the reconnect task, use `stop`.
+
+## Acknowledgements
+
+The MQTT client is based on [micro-mqtt](https://github.com/rovale/micro-mqtt).

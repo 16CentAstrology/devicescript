@@ -7,7 +7,13 @@
 // #define VLOGGING 1
 #include "devs_logging.h"
 
+#define JD_GC_KEEP (!JD_HOSTED)
+
 void devs_gc_obj_check_core(devs_gc_t *gc, const void *ptr);
+
+// we run GC when allocation size since last GC reaches heap_size/JD_GC_FRACTION
+// (or when the requested allocation doesn't fit)
+#define JD_GC_FRACTION 4
 
 #define ROOT_SCAN_DEPTH 10
 
@@ -16,6 +22,7 @@ void devs_gc_obj_check_core(devs_gc_t *gc, const void *ptr);
 
 #define IS_FREE(header) (BASIC_TAG(header) == DEVS_GC_TAG_FREE)
 
+// in words
 #define BLOCK_SIZE(p) ((p)&0xffffff)
 
 #if JD_64
@@ -42,6 +49,7 @@ typedef struct _devs_gc_block_t {
         devs_gc_object_t gc;
         devs_array_t array;
         devs_buffer_t buffer;
+        devs_gimage_t image;
         devs_map_t map;
         devs_short_map_t short_map;
         devs_activation_t act;
@@ -60,6 +68,8 @@ struct _devs_gc_t {
     block_t *first_free;
     chunk_t *first_chunk;
     uint32_t num_alloc;
+    uint32_t gc_threshold;
+    uint32_t curr_alloc;
     devs_ctx_t *ctx;
 };
 
@@ -83,8 +93,21 @@ void devs_gc_add_chunk(devs_gc_t *gc, void *start, unsigned size) {
     chunk_t *ch = start;
     ch->end =
         (block_t *)(((uintptr_t)((uint8_t *)start + size) & ~(JD_PTRSIZE - 1)) - sizeof(uintptr_t));
-    ch->next = gc->first_chunk;
-    gc->first_chunk = ch;
+
+    gc->gc_threshold += size / sizeof(void *) / JD_GC_FRACTION;
+
+    ch->next = NULL;
+    if (gc->first_chunk == NULL) {
+        gc->first_chunk = ch;
+    } else {
+        for (chunk_t *p = gc->first_chunk; p; p = p->next) {
+            JD_ASSERT(p < ch); // addresses have to be in order
+            if (p->next == NULL) {
+                p->next = ch;
+                break;
+            }
+        }
+    }
     ch->end->header = DEVS_GC_MK_TAG_WORDS(DEVS_GC_TAG_FINAL, 1);
     mark_block(gc, ch->start, DEVS_GC_TAG_FREE, block_ptr(ch->end) - block_ptr(ch->start));
 }
@@ -143,6 +166,10 @@ static void scan_gc_obj(devs_ctx_t *ctx, block_t *block, int depth) {
         switch (BASIC_TAG(header)) {
         case DEVS_GC_TAG_BUFFER:
             map = block->buffer.attached;
+            break;
+        case DEVS_GC_TAG_IMAGE:
+            scan_gc_obj(ctx, (block_t *)block->image.buffer, depth);
+            map = block->image.attached;
             break;
         case DEVS_GC_TAG_SHORT_MAP:
         case DEVS_GC_TAG_HALF_STATIC_MAP:
@@ -212,6 +239,10 @@ static void mark_roots(devs_gc_t *gc) {
         }
     }
 
+    for (unsigned i = 0; i < ctx->num_pins; ++i) {
+        scan_value(ctx, ctx->pin_state[i].obj, ROOT_SCAN_DEPTH);
+    }
+
     scan_gc_obj(ctx, (block_t *)ctx->fn_protos, ROOT_SCAN_DEPTH);
     scan_gc_obj(ctx, (block_t *)ctx->fn_values, ROOT_SCAN_DEPTH);
     scan_gc_obj(ctx, (block_t *)ctx->spec_protos, ROOT_SCAN_DEPTH);
@@ -228,6 +259,7 @@ static void mark_roots(devs_gc_t *gc) {
     }
 }
 
+// in words
 static inline unsigned block_size(block_t *b) {
     unsigned sz = BLOCK_SIZE(b->header);
     JD_ASSERT(sz > 0);
@@ -256,6 +288,7 @@ static void sweep(devs_gc_t *gc) {
     int sweep = 0;
     block_t *prev = NULL;
     gc->first_free = NULL;
+    gc->curr_alloc = 0;
 
     for (;;) {
         int had_pending = 0;
@@ -391,7 +424,10 @@ static block_t *alloc_block(devs_gc_t *gc, unsigned tag, unsigned size) {
     if (devs_get_global_flags() & DEVS_FLAG_GC_STRESS) {
         validate_heap(gc);
         devs_gc(gc);
+    } else if (gc->curr_alloc > gc->gc_threshold) {
+        devs_gc(gc);
     }
+    gc->curr_alloc += words;
 
     block_t *b = find_free_block(gc, tag, words);
     if (!b) {
@@ -515,15 +551,22 @@ devs_array_t *devs_array_try_alloc(devs_ctx_t *ctx, unsigned size) {
     return arr;
 }
 
-devs_buffer_t *devs_buffer_try_alloc(devs_ctx_t *ctx, unsigned size) {
+devs_buffer_t *devs_buffer_try_alloc_init(devs_ctx_t *ctx, const void *data, unsigned size) {
     if (size > DEVS_MAX_ALLOC) {
         devs_throw_too_big_error(ctx, DEVS_BUILTIN_STRING_BUFFER);
         return NULL;
     }
     devs_buffer_t *buf = devs_any_try_alloc(ctx, DEVS_GC_TAG_BUFFER, sizeof(devs_buffer_t) + size);
-    if (buf)
+    if (buf) {
         buf->length = size;
+        if (data)
+            memcpy(buf->data, data, size);
+    }
     return buf;
+}
+
+devs_buffer_t *devs_buffer_try_alloc(devs_ctx_t *ctx, unsigned size) {
+    return devs_buffer_try_alloc_init(ctx, NULL, size);
 }
 
 devs_string_t *devs_string_try_alloc(devs_ctx_t *ctx, unsigned size) {
@@ -669,16 +712,38 @@ void devs_gc_destroy(devs_gc_t *gc) {
 
 #else
 
+#if JD_GC_KEEP
+// we only allocate the GC heap once, and keep it - this is to avoid problems with fragmented memory
+// in the system allocator
+static devs_gc_t *global_gc;
+static uint32_t global_gc_size;
+#endif
+
 devs_gc_t *devs_gc_create(void) {
     unsigned size = JD_GC_KB * 1024;
-    devs_gc_t *gc = jd_alloc(sizeof(devs_gc_t) + size);
+    devs_gc_t *gc;
+
+#if JD_GC_KEEP
+    if (!global_gc) {
+        global_gc_size = sizeof(devs_gc_t) + size;
+        global_gc = jd_alloc(global_gc_size);
+    }
+    gc = global_gc;
+#else
+    gc = jd_alloc(sizeof(devs_gc_t) + size);
+#endif
+
     devs_gc_add_chunk(gc, gc + 1, size);
     return gc;
 }
 
 void devs_gc_destroy(devs_gc_t *gc) {
+#if JD_GC_KEEP
+    memset(gc, 0, global_gc_size);
+#else
     gc->first_chunk = NULL;
     jd_free(gc);
+#endif
 }
 
 #endif
@@ -726,6 +791,7 @@ int devs_dump_heap(devs_ctx_t *ctx, int off, int cnt) {
     int numobj = 0;
     int used_size = 0;
     int free_size = 0;
+    int max_free_block = 0;
 
     for (chunk_t *chunk = ctx->gc->first_chunk; chunk; chunk = chunk->next) {
         for (block_t *block = chunk->start;; block = next_block(block)) {
@@ -738,9 +804,11 @@ int devs_dump_heap(devs_ctx_t *ctx, int off, int cnt) {
             if (off == -1) {
                 numobj++;
                 int sz = block_size(block) * sizeof(void *);
-                if (tag == DEVS_GC_TAG_FREE)
+                if (tag == DEVS_GC_TAG_FREE) {
                     free_size += sz;
-                else
+                    if (sz > max_free_block)
+                        max_free_block = sz;
+                } else
                     used_size += sz;
                 continue;
             }
@@ -764,7 +832,8 @@ int devs_dump_heap(devs_ctx_t *ctx, int off, int cnt) {
     }
 
     if (off == -1) {
-        JD_LOG("stats: %d objects, %d B used, %d B free", numobj, used_size, free_size);
+        JD_LOG("stats: %d objects, %d B used, %d B free (%d B max block)", numobj, used_size,
+               free_size, max_free_block);
     }
 
     return curr;

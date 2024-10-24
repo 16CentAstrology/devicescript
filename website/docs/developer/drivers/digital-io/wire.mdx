@@ -1,0 +1,81 @@
+---
+description: Arduino-like GPIO APIs
+title: Wire
+sidebar_position: 9
+---
+
+# Wire
+
+`digitalWrite`, `digitalRead`, `pinMode` functions are provided for Arduino-like
+digital IO.
+
+## pinMode
+
+Sets the pin input/output and pull up/down mode.
+
+```ts
+import { gpio } from "@devicescript/core"
+import { GPIOMode } from "@devicescript/core"
+// highlight-next-line
+import { pinMode } from "@devicescript/gpio"
+
+const pin = gpio(0)
+// highlight-next-line
+pinMode(pin, GPIOMode.Output)
+```
+
+### digitalWrite
+
+For digital output, you can use `digitalWrite` function.
+
+```ts
+import { gpio } from "@devicescript/core"
+import { HIGH, GPIOMode } from "@devicescript/core"
+// highlight-next-line
+import { pinMode, digitalWrite } from "@devicescript/gpio"
+
+const pin = gpio(0)
+pinMode(pin, GPIOMode.Output)
+
+// highlight-start
+digitalWrite(pin, true)
+digitalWrite(pin, 1)
+digitalWrite(pin, HIGH)
+// highlight-end
+```
+
+## digitalRead
+
+For digital input, you can use `digitalRead` function.
+
+```ts
+import { gpio } from "@devicescript/core"
+import { GPIOMode } from "@devicescript/core"
+// highlight-next-line
+import { pinMode, digitalRead } from "@devicescript/gpio"
+
+const pin = gpio(0)
+pinMode(pin, GPIOMode.Input)
+
+// highlight-start
+const value = digitalRead(pin)
+// highlight-end
+```
+
+## subscribeDigital
+
+You can also subscribe to digital input changes.
+
+```ts
+import { gpio } from "@devicescript/core"
+import { GPIOMode } from "@devicescript/core"
+// highlight-next-line
+import { pinMode, subscribeDigital } from "@devicescript/gpio"
+
+const pin = gpio(0)
+pinMode(pin, GPIOMode.Input)
+
+// highlight-start
+subscribeDigital(pin, value => console.data({ value }))
+// highlight-end
+```

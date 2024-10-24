@@ -18,9 +18,8 @@ export interface DeviceScriptConfig extends DeviceHardwareInfo {
     devNetwork?: boolean
 }
 
-export type UserHardwareInfo = Pick<
-    DeviceScriptConfig,
-    "scanI2C" | "devNetwork"
+export type UserHardwareInfo = Partial<
+    Exclude<DeviceScriptConfig, "pins" | "sPins">
 >
 // END-DS-SERVERS
 
@@ -38,9 +37,28 @@ export interface DeviceProps {
 
 export type ProgramConfig = Partial<DeviceProps> & Partial<DeviceScriptConfig>
 
+export interface FstorConfig {
+    /**
+     * Size of a flash page, typically 4096.
+     */
+    flashPageSize: number
+
+    /**
+     * Total number of pages in FSTOR.
+     * Often 32 (for 128k) or 64 (for 256k).
+     */
+    fstorPages: number
+
+    /**
+     * Offset where FSTOR sits in total flash space.
+     */
+    fstorOffset: HexInt
+}
+
 export interface DeviceConfig
     extends DeviceProps,
         DeviceScriptConfig,
+        Partial<FstorConfig>,
         JsonComment {
     $schema?: string
 
@@ -95,6 +113,18 @@ export interface DeviceConfig
      * Services to expose via `startXYZ()` API. Each starts with { "service": "..." }
      */
     $services?: ServiceConfig[]
+
+    /**
+     * Labels to expose pins in `@dsboard/foo` modules
+     * If pin X (`pins.X`) is to be exposed as Y, then `$pins.Y == X`.
+     */
+    $pins?: Record<string, string>
+
+    /**
+     * Extra arguments to be passed to the flash tool.
+     * For example, `--flash_mode` for `esptool.py` (ESP32 boards).
+     */
+    $flashToolArguments?: string[]
 }
 
 export function parseAnyInt(s: string | number) {
@@ -158,6 +188,7 @@ export interface PkgJson {
         library?: boolean
         bundle?: boolean
     }
+    dependencies?: Record<string, string>
 }
 
 export interface LocalBuildConfig {
@@ -250,7 +281,7 @@ export interface PinFunctionInfo {
 
 export type PinFunction = keyof PinFunctionInfo
 
-export interface ArchConfig extends JsonComment {
+export interface ArchConfig extends JsonComment, FstorConfig {
     $schema?: string
 
     /**
@@ -291,7 +322,7 @@ export interface ArchConfig extends JsonComment {
 
     /**
      * Force alignment of the last page in the patched UF2 file.
-     * Set to 4096 on RP2040 because wof RP2040-E14.
+     * Set to 4096 on RP2040 because of RP2040-E14.
      */
     uf2Align?: HexInt
 
@@ -309,4 +340,11 @@ export interface ArchConfig extends JsonComment {
      * Defines a mapping from a pin function
      */
     pins?: PinFunctionInfo & JsonComment
+}
+
+export function architectureFamily(
+    archId: string
+): "esp32" | "rp2040" | string {
+    for (const a of ["esp32", "rp2040"]) if (archId.startsWith(a)) return a
+    return archId
 }

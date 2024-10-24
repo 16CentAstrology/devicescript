@@ -1,4 +1,3 @@
-import { SerialPort } from "serialport"
 import { delimiter, join, resolve } from "path"
 import { existsSync, readFileSync, Stats, writeFileSync } from "fs"
 import { spawn } from "child_process"
@@ -14,6 +13,7 @@ import { mkdirp } from "fs-extra"
 import { delay, groupBy } from "jacdac-ts"
 import { buildConfigFromDir } from "./build"
 import { patchCustomBoard } from "./binpatch"
+import { tryRequire } from "./require"
 
 let buildConfig: ResolvedBuildConfig
 
@@ -24,14 +24,56 @@ export function setupFlashBoards(dir = ".") {
 }
 
 export interface FlashOptions {
+    /**
+     * Which board to flash. Required.
+     */
     board?: string
+
+    /**
+     * Do no wait for device to be connected - fail immediately if not found.
+     */
     once?: boolean
+
+    /**
+     * Always re-download the firmware file, even if cached less than 1 day old.
+     */
+    refresh?: boolean
+
+    /**
+     * Automatically install missing flashing utilities.
+     * For ESP32, if {@link https://docs.espressif.com/projects/esptool/en/latest/esp32/ | esptool} is missing,
+     * run `py -m pip install esptool`
+     */
+    install?: boolean
+
+    /**
+     * Path to the python executable.
+     */
+    python?: string
+
+    /**
+     * Delete settings and user program instead of flashing the firmware.
+     */
+    clean?: boolean
+
+    /**
+     * Write specified BIN or UF2 file instead of downloaded firmware.
+     */
+    file?: string
+
+    /**
+     * The flash command is run from a remote workspace
+     */
+    remote?: boolean
 }
 
 export interface FlashESP32Options extends FlashOptions {
     allSerial?: boolean
     baud?: string
     port?: string
+    /**
+     * Path to the esptool.py script.
+     */
     esptool?: string
 }
 
@@ -72,26 +114,53 @@ export function showAllBoards(arch: string, opt = "--board") {
     )
 }
 
-async function checkBoard(arch: string, options: FlashOptions) {
-    await setupFlashBoards()
-    const b = buildConfig.boards[options.board]
-    if (!b) {
+export async function resolveBoard(arch: string, options: FlashOptions) {
+    setupFlashBoards()
+    const board = buildConfig.boards[options.board]
+    if (!board) {
         showAllBoards(arch)
         if (!options.board) fatal("missing --board")
         else fatal("invalid board id: " + options.board)
     }
-    return b
+    return { board, arch: buildConfig.archs[board.archId] }
 }
 
 export async function flashESP32(options: FlashESP32Options) {
+    const { SerialPort } = await tryRequire("serialport")
+    const { board } = await resolveBoard("esp32", options)
+
+    if (options.remote) {
+        if (options.clean)
+            log(`clearing flashing from a remote workspace is not supported`)
+        else {
+            const fw = await fetchFW(board, options)
+            const moff = /-(0x[a-f0-9]+)\.bin$/.exec(fw)
+            if (!moff)
+                fatal(
+                    "invalid $fwUrl format, should end in -0x1000.bin or similar"
+                )
+            log(`flash firmware instructions:`)
+            log(
+                `-  open https://adafruit.github.io/Adafruit_WebSerial_ESPTool/`
+            )
+            log(
+                `-  connect your device in bootloader mode (see https://learn.adafruit.com/adafruit-magtag/web-serial-esptool)`
+            )
+            if (moff[1] !== "0x0") log(`-  update **Offset** to ${moff}`)
+            log(`-  click on **Choose a file** and selec the file below`)
+            log(fw)
+            log(`-  click **Program** and wait for the transfer to finish`)
+            log(`-  Reset the device and reconnect`)
+        }
+        return
+    }
+
     const vendors = [
         0x10c4, // SiLabs CP2102
         0x303a, // Espressif (C3, S2, ...)
         0x1a86, // CH340 etc
         0x0403, // M5stick
     ]
-
-    const board = await checkBoard("esp32", options)
 
     const listPorts = async () => {
         const ports = await SerialPort.list()
@@ -109,7 +178,7 @@ export async function flashESP32(options: FlashESP32Options) {
 
     const filterPorts = () => {
         if (!options.allSerial) {
-            ports = ports.filter(p =>
+            ports = ports.filter((p: any) =>
                 vendors.includes(parseInt(p.vendorId, 16))
             )
             if (!msg && ports.length == 0) {
@@ -120,7 +189,7 @@ export async function flashESP32(options: FlashESP32Options) {
     }
 
     if (options.port) {
-        ports = ports.filter(p => p.path == options.port)
+        ports = ports.filter((p: any) => p.path == options.port)
         if (ports.length == 0) {
             printPorts()
             fatal(`port ${options.port} not found`)
@@ -173,17 +242,21 @@ export async function flashESP32(options: FlashESP32Options) {
     }
 
     if (!options.esptool) {
-        for (const tool of [
-            "python -m esptool",
-            "python3 -m esptool",
-            "/usr/local/bin/python -m esptool",
-        ]) {
-            const { stdout } = await runTool({ cmd: tool, quiet: true })
-            if (oldEsptool(stdout) === "") {
-                options.esptool = tool
+        await findEsptool()
+    }
+
+    if (!options.esptool && options.install) {
+        log("trying to install esptool with pip...")
+        for (const cmd of pythonPaths().map(
+            py => `${py} -m pip install esptool`
+        )) {
+            const { stdout } = await runTool({ cmd, quiet: true })
+            if (/esptool/.test(stdout)) {
+                console.log(`esptool installed`)
                 break
             }
         }
+        await findEsptool()
     }
 
     if (!options.esptool) {
@@ -197,20 +270,52 @@ export async function flashESP32(options: FlashESP32Options) {
 
     log(`esptool: ${options.esptool}`)
 
-    const cachePath = await fetchFW(board)
+    const cachePath = await fetchFW(board, options)
 
-    const moff = /-(0x[a-f0-9]+)\.bin$/.exec(cachePath)
-    if (!moff)
-        fatal("invalid $fwUrl format, should end in -0x1000.bin or similar")
-
-    const { code } = await runEsptool("write_flash", moff[1], cachePath)
-
-    if (code === 0) {
-        log("flash OK!")
-        process.exit(0)
+    if (options.clean) {
+        const { code } = await runEsptool("erase_flash")
+        if (code === 0) {
+            log("erase flash OK!")
+            process.exit(0)
+        } else {
+            error("erase flash failed")
+            process.exit(1)
+        }
     } else {
-        error("flash failed")
-        process.exit(1)
+        const moff = /-(0x[a-f0-9]+)\.bin$/.exec(cachePath)
+        if (!moff)
+            fatal("invalid $fwUrl format, should end in -0x1000.bin or similar")
+
+        const { $flashToolArguments = [] } = board
+        const { code } = await runEsptool(
+            "write_flash",
+            ...$flashToolArguments,
+            moff[1],
+            cachePath
+        )
+
+        if (code === 0) {
+            log("flash OK, you can connect again to the device.")
+            process.exit(0)
+        } else {
+            error("flash failed")
+            process.exit(1)
+        }
+    }
+
+    function pythonPaths() {
+        if (options.python) return [options.python]
+        else return ["py", "python", "python3", "/usr/local/bin/python"]
+    }
+
+    async function findEsptool() {
+        for (const tool of pythonPaths().map(py => `${py} -m esptool`)) {
+            const { stdout } = await runTool({ cmd: tool, quiet: true })
+            if (oldEsptool(stdout) === "") {
+                options.esptool = tool
+                break
+            }
+        }
     }
 
     function printPorts(all = true) {
@@ -303,7 +408,9 @@ export async function flashESP32(options: FlashESP32Options) {
     }
 }
 
-async function fetchFW(board: DeviceConfig) {
+export async function fetchFW(board: DeviceConfig, options: FlashOptions) {
+    if (options.file) return options.file
+
     let dlUrl = board.$fwUrl
     let needsPatch = false
     if (!dlUrl) {
@@ -318,11 +425,18 @@ async function fetchFW(board: DeviceConfig) {
         }
     }
 
+    if (options.clean && board.archId.includes("rp2040"))
+        dlUrl = "https://datasheets.raspberrypi.com/soft/flash_nuke.uf2"
+
     const bn = dlUrl.replace(/.*\//, "")
     const cachedFolder = ".devicescript/cache/"
     const cachePath = cachedFolder + bn
     const st = await stat(cachePath, { bigint: false }).catch<Stats>(_ => null)
-    if (st && Date.now() - st.mtime.getTime() < 24 * 3600 * 1000) {
+    if (
+        !options.refresh &&
+        st &&
+        Date.now() - st.mtime.getTime() < 24 * 3600 * 1000
+    ) {
         log(`using cached ${cachePath}`)
     } else {
         log(`fetch ${dlUrl}`)
@@ -467,7 +581,20 @@ async function rescan<T>(
 }
 
 export async function flashRP2040(options: FlashRP2040Options) {
-    const board = await checkBoard("rp2040", options)
+    const { board } = await resolveBoard("rp2040", options)
+    const fn = await fetchFW(board, options)
+
+    if (options.remote) {
+        log(`flash firmware instructions:`)
+        log(`-  put your device in bootloader mode`)
+        log(`-  copy the .UF2 file below to the BOOT drive`)
+        log(fn)
+        log(
+            `-  once the copy is complete, your device should reset in application mode`
+        )
+        return
+    }
+
     if (!options.drive) {
         const drives = await rescan(
             options,
@@ -484,19 +611,18 @@ export async function flashRP2040(options: FlashRP2040Options) {
         options.drive = drives[0]
     }
     log(`using drive ${options.drive}`)
-    const fn = await fetchFW(board)
     const buf = readFileSync(fn)
     log(`cp ${fn} ${options.drive}`)
     await writeFile(join(options.drive, "fw.uf2"), buf)
-    log("OK")
+    log("flash OK, you can connect again to the device.")
 }
 
 export async function flashAuto(options: FlashOptions) {
-    const board = await checkBoard("", options)
-    const arch = architectureFamily(board.archId)
-    if (arch == "esp32") return flashESP32(options)
-    else if (arch == "rp2040") return flashRP2040(options)
+    const { board } = await resolveBoard("", options)
+    const archFamily = architectureFamily(board.archId)
+    if (archFamily == "esp32") return flashESP32(options)
+    else if (archFamily == "rp2040") return flashRP2040(options)
     else {
-        fatal(`unknown arch family: ${arch}`)
+        fatal(`unknown arch family: ${archFamily}`)
     }
 }

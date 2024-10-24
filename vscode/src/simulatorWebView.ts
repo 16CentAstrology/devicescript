@@ -1,7 +1,8 @@
 import * as vscode from "vscode"
 import { JDEventSource } from "jacdac-ts"
 import { DeviceScriptExtensionState } from "./state"
-import { logo } from "./assets"
+import { logo, resolveDarkMode } from "./assets"
+import { resolveDevtoolsPath } from "./devtoolsserver"
 
 class SimulatorsSerializer implements vscode.WebviewPanelSerializer {
     constructor(readonly deserialize: (view: vscode.WebviewPanel) => void) {}
@@ -28,15 +29,8 @@ export class SimulatorsWebView extends JDEventSource {
     private simulatorsWebviewPanel: vscode.WebviewPanel
 
     private async generateSimulatorsHtml() {
-        const { kind: colorThemeKind } = vscode.window.activeColorTheme
-        const darkMode =
-            colorThemeKind === vscode.ColorThemeKind.Dark ||
-            colorThemeKind === vscode.ColorThemeKind.HighContrast
-                ? "dark"
-                : "light"
-        const fullWebServerUri = await vscode.env.asExternalUri(
-            vscode.Uri.parse(`http://localhost:8081/`)
-        )
+        const darkMode = resolveDarkMode()
+        const fullWebServerUri = await resolveDevtoolsPath()
         const cspSource = this.simulatorsWebviewPanel.webview.cspSource
         const nonce = getNonce()
 
@@ -115,7 +109,23 @@ export class SimulatorsWebView extends JDEventSource {
         }
     }
 
-    private async handleOpen() {
+    private dontShowStartSimulatorDialogAgain = false
+    private async handleOpen(options?: { askUser?: boolean }) {
+        const { askUser } = options || {}
+        if (!this.simulatorsWebviewPanel && askUser) {
+            if (this.dontShowStartSimulatorDialogAgain) return
+
+            const start = "Start"
+            const noShow = "Don't show again"
+            const res = await vscode.window.showInformationMessage(
+                "DeviceScript: Start simulators?",
+                start,
+                noShow
+            )
+            if (res === noShow) this.dontShowStartSimulatorDialogAgain = true
+            if (res !== start) return
+        }
+
         if (this.simulatorsWebviewPanel) {
             this.simulatorsWebviewPanel.reveal(undefined, true)
             // make sure the tools are running

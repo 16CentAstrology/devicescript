@@ -1,0 +1,31 @@
+---
+sidebar_position: 3.1
+hide_table_of_contents: true
+---
+
+import WokwiEditor from "@site/src/components/WokwiEditor"
+
+# Button LED
+
+This sample toggles a LED on/off by listening on the `down` events emitted by a button.
+
+```ts
+import { pins } from "@dsboard/esp32c3_bare"
+import { startLightBulb, startButton } from "@devicescript/servers"
+
+const led = startLightBulb({
+    pin: pins.P2,
+})
+const button = startButton({
+    pin: pins.P5,
+})
+console.log(`press button to toggle light`)
+// listen for button down events
+button.down.subscribe(async () => {
+    // toggle light on/off
+    console.log(`toggle`)
+    await led.toggle()
+})
+```
+
+<WokwiEditor projectId="369061499438874625" />

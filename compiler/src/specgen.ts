@@ -3,6 +3,7 @@ import {
     DeviceConfig,
     LocalBuildConfig,
     ResolvedBuildConfig,
+    architectureFamily,
 } from "@devicescript/interop"
 import {
     SRV_BOOTLOADER,
@@ -25,13 +26,19 @@ import {
     SRV_CODAL_MESSAGE_BUS,
     SRV_DEVS_DBG,
     SRV_TCP,
+    SRV_I2C,
+    SRV_SETTINGS,
+    SRV_CLOUD_ADAPTER,
+    SRV_ROS,
+    SRV_GPIO,
 } from "jacdac-ts"
 import { boardSpecifications, jacdacDefaultSpecifications } from "./embedspecs"
 import { PacketSpecCode, runtimeVersion } from "./format"
 import { prelude } from "./prelude"
 import { camelize, oops, upperCamel, upperFirst } from "./util"
-import { pinFunctions } from "./board"
+import { pinsInfo } from "./board"
 import { assert } from "./jdutil"
+import { TSDOC_NATIVE, TSDOC_START } from "./compiler"
 
 const REGISTER_NUMBER = "Register<number>"
 const REGISTER_BOOL = "Register<boolean>"
@@ -85,7 +92,9 @@ function toHex(n: number): string {
 function noCtorSpec(info: jdspec.ServiceSpec) {
     return [].indexOf(info.classIdentifier) > -1
 }
-
+function noClientMarkdownSpec(info: jdspec.ServiceSpec) {
+    return [SRV_CONTROL].indexOf(info.classIdentifier) > -1
+}
 function ignoreSpec(info: jdspec.ServiceSpec) {
     return (
         info.status === "deprecated" ||
@@ -106,6 +115,7 @@ function ignoreSpec(info: jdspec.ServiceSpec) {
             SRV_CODAL_MESSAGE_BUS,
             SRV_DEVS_DBG,
             SRV_TCP,
+            SRV_GPIO,
         ].indexOf(info.classIdentifier) > -1
     )
 }
@@ -142,6 +152,7 @@ export function pktName(pkt: jdspec.PacketInfo): string {
 export function specToDeviceScript(info: jdspec.ServiceSpec): string {
     let r = ""
     let srv = ""
+    let lkp = ""
 
     for (const en of Object.values(info.enums)) {
         const enPref = enumName(info, en.name)
@@ -170,7 +181,7 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
             cmt += "@experimental\n"
         if (info.group) cmt += `@group ${info.group}\n`
         if (info.tags?.length) cmt += `@category ${info.tags.join(", ")}\n`
-        if (docUrl) cmt += `@see {@link ${docUrl} Documentation}`
+        if (docUrl) cmt += `@see {@link ${docUrl} | Documentation}`
         r += wrapComment("devs", patchLinks(cmt))
     }
     // emit class
@@ -182,6 +193,7 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
             ? "SensorServerSpec"
             : "BaseServerSpec"
     srv += `interface ${clname}ServerSpec extends ${ibase} {\n`
+    lkp += `interface ${clname}LookupSpec extends ServiceSpec {\n`
 
     if (noCtorSpec(info))
         r +=
@@ -192,16 +204,18 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
             wrapComment("devs", "Create new service client.") +
             "    constructor(roleName?: string)\n"
 
-    r +=
-        wrapComment("devs", `Static specification for ${info.name}`) +
-        "    static spec: ServiceSpec\n"
+    if (info.shortId != "_sensor")
+        r +=
+            wrapComment("devs", `Static specification for ${info.name}`) +
+            `    static spec: ${clname}LookupSpec\n`
 
     let codes =
         wrapComment("devs", `Spec-code definitions for ${info.name}`) +
         `enum ${clname}Codes {\n`
 
+    let lastName = ""
     info.packets.forEach(pkt => {
-        if (pkt.derived) return
+        if (pkt.derived || pkt.pipeType) return
         const cmt = addComment(pkt)
         let kw = ""
         let tp = ""
@@ -229,12 +243,14 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
                     const args = pktFields(info, pkt)
                     srv += `    set_${nameOfPkt}${opt}(${args}): AsyncValue<void>\n`
                 }
+                lkp += `    lookup(name: "${nameOfPkt}"): RegisterSpec<${argtp}>\n`
             }
         } else if (pkt.kind == "event") {
             enumPref = "Event"
             enumMask = PacketSpecCode.EVENT
             kw = "readonly "
             tp = "Event"
+            lkp += `    lookup(name: "${nameOfPkt}"): EventSpec<${argtp}>\n`
             // skip events for srv for now
         } else if (pkt.kind == "command") {
             enumPref = "Cmd"
@@ -249,9 +265,13 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
             )
             r += `    ${commandSig(info, pkt).sig}\n`
             srv += `    ${commandSig(info, pkt, true).sig}\n`
+            lkp += `    lookup(name: "${nameOfPkt}"): ActionSpec<${argtp}>\n`
+            lastName = nameOfPkt
         } else if (pkt.kind == "report") {
             enumPref = "Report"
             enumMask = PacketSpecCode.REPORT
+            if (lastName != nameOfPkt)
+                lkp += `    lookup(name: "${nameOfPkt}"): ReportSpec<${argtp}>\n`
         }
 
         if (enumPref) {
@@ -264,7 +284,7 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
             if (docUrl)
                 cmt.comment += `@see {@link ${docUrl}#${pkt.kind}:${pktName(
                     pkt
-                )} Documentation}`
+                )} | Documentation}`
             r += wrapComment("devs", cmt.comment)
             r += `    ${kw}${nameOfPkt}${sx}: ${tp}<${argtp}>\n`
         }
@@ -274,8 +294,10 @@ export function specToDeviceScript(info: jdspec.ServiceSpec): string {
 
     r += "}\n\n" + codes
     srv += "}\n"
+    lkp += "}\n"
 
     r += srv
+    r += lkp
 
     return r.replace(/ *$/gm, "")
 }
@@ -289,7 +311,20 @@ const pinFunToType: Record<string, string> = {
 }
 
 function boardFile(binfo: DeviceConfig, arch: ArchConfig) {
-    let r = `declare module "@dsboard/${binfo.id}" {\n`
+    let r = `
+/**
+ * Pin mapping and built-in services for ${binfo.devName}
+ *
+ * ${
+     binfo.$custom || !binfo.archId || !binfo.id
+         ? "This is a custom board definition."
+         : `@see {@link https://microsoft.github.io/devicescript/devices/${architectureFamily(
+               binfo.archId
+           )}/${binfo.id.replace(/_/g, "-")}/ Catalog}`
+ }
+ * ${binfo.url ? `@see {@link ${binfo.url} Store}` : ``}
+*/
+declare module "@dsboard/${binfo.id}" {\n`
     r += `    import * as ds from "@devicescript/core"\n`
     r += `    interface Board {\n`
     for (const service of binfo.$services ?? []) {
@@ -297,39 +332,51 @@ function boardFile(binfo: DeviceConfig, arch: ArchConfig) {
         const inst = service.name ? upperFirst(service.name) : serv
         r += wrapComment(
             "devs",
-            `Start built-in ${inst}\n@ds-start ${JSON.stringify(service)}`
+            `Start built-in ${inst}\n@${TSDOC_START} ${JSON.stringify(service)}`
         )
         r += `        start${inst}(roleName?: string): ds.${serv}\n`
     }
     r += `    }\n`
     r += `    const board: Board\n`
     r += `    interface BoardPins {\n`
-    const pinMap = (binfo.pins ?? {}) as Record<string, number>
-    for (const pinName of Object.keys(pinMap)) {
-        if (pinName.startsWith("#")) continue
-        if (pinName.startsWith("@")) continue
-        const gpio = pinMap[pinName]
-        const funs = pinFunctions(arch.pins, gpio)
+    const { infos } = pinsInfo(arch, binfo)
+    for (const pin of infos) {
+        if (
+            pin.label.startsWith("@") ||
+            (pin.functionLabel && !pin.functionLabel.startsWith("$services")) ||
+            pin.functionLabel === pin.silkLabel
+        )
+            continue
+
+        const funs = pin.functions
         const types = funs
             .map(s => pinFunToType[s])
             .filter(s => !!s)
             .map(s => "ds." + s)
-        if (types.length == 0) r += `        // ${pinName} seems invalid\n`
+        if (types.length == 0) r += `        // ${pin.label} seems invalid\n`
         else {
+            const cmn = pin.commonLabel != pin.silkLabel
             r += [
                 `/**`,
-                ` * Pin ${pinName} (GPIO${gpio}, ${funs.join(", ")})`,
-                ` *`,
-                ` * @ds-gpio ${gpio}`,
+                ` * Pin ${pin.silkLabel} (GPIO${pin.gpio}, ${funs.join(", ")})`,
+                pin.functionLabel
+                    ? ` * @note can be also used as ${pin.functionLabel}`
+                    : undefined,
+                cmn ? ` * @${TSDOC_NATIVE} GPIO.${pin.commonLabel}` : undefined,
                 ` */`,
-                // `//% gpio=${gpio}`,
-                `${pinName}: ${types.join(" & ")}`,
+                `${pin.silkLabel}: ${types.join(" & ")}`,
             ]
+                .filter(Boolean)
                 .map(l => "        " + l + "\n")
                 .join("")
         }
     }
     r += `    }\n`
+    r += `    /**\n`
+    r += `     * Pin definitions for ${binfo.devName}\n`
+    r += `     *\n`
+    r += `     * @${TSDOC_NATIVE} GPIO\n`
+    r += `     */\n`
     r += `    const pins: BoardPins\n`
     r += `}\n`
     return r
@@ -364,6 +411,14 @@ ${thespecs}
     return r
 }
 
+const serviceBuiltinPackages: Record<number, string> = {
+    [SRV_I2C]: "i2c",
+    [SRV_SETTINGS]: "settings",
+    [SRV_CLOUD_ADAPTER]: "cloud",
+    [SRV_ROS]: "ros",
+    [SRV_GPIO]: "gpio",
+}
+
 function serviceSpecificationToMarkdown(info: jdspec.ServiceSpec): string {
     const { status, camelName } = info
 
@@ -386,7 +441,7 @@ The [${info.name} service](https://microsoft.github.io/jacdac-docs/services/${in
 `
     }
 
-    if (ignoreSpec(info) || noCtorSpec(info)) {
+    if (ignoreSpec(info) || noCtorSpec(info) || noClientMarkdownSpec(info)) {
         return `---
 pagination_prev: null
 pagination_next: null
@@ -397,6 +452,23 @@ unlisted: true
 The [${info.name} service](https://microsoft.github.io/jacdac-docs/services/${info.shortId}/) is used internally by the runtime
 and is not directly programmable in DeviceScript.
 
+{@import optional ../clients-custom/${info.shortId}.mdp}
+`
+    }
+
+    const builtinPackage = serviceBuiltinPackages[info.classIdentifier]
+    if (builtinPackage) {
+        return `---
+pagination_prev: null
+pagination_next: null
+description: DeviceScript client for ${info.name} service
+---
+# ${clname}
+        
+The [${info.name} service](https://microsoft.github.io/jacdac-docs/services/${info.shortId}/) is used internally by the 
+[\`@devicescript/${builtinPackage}\`](/developer/packages) package.
+
+{@import optional ../clients-custom/${info.shortId}.mdp}
 `
     }
 
@@ -404,7 +476,7 @@ and is not directly programmable in DeviceScript.
         `---
 pagination_prev: null
 pagination_next: null
-description: DeviceScript client for Jacdac ${info.name} service
+description: DeviceScript client for ${info.name} service
 ---
 # ${clname}
 `,
@@ -416,8 +488,7 @@ This service is ${status} and may change in the future.
 `
             : undefined,
         patchLinks(info.notes["short"]),
-        `-  client for [${info.name} service](https://microsoft.github.io/jacdac-docs/services/${info.shortId}/)`,
-        baseclass ? `-  inherits ${baseclass}` : undefined,
+        `\n{@import optional ../clients-custom/${info.shortId}-short.mdp}\n`,
         info.notes["long"]
             ? `## About
 
@@ -431,11 +502,13 @@ import { ${clname} } from "@devicescript/core"
 const ${varname} = new ${clname}()
 \`\`\`
             `,
+        `{@import optional ../clients-custom/${info.shortId}-about.mdp}`,
     ]
 
     const cmds = info.packets.filter(
         pkt =>
             pkt.kind === "command" &&
+            !pkt.pipeType &&
             !pkt.internal &&
             !pkt.derived &&
             !pkt.lowLevel
@@ -459,7 +532,14 @@ ${varname}.${sig}
     const regs = info.packets
         .filter(pkt => isRegister(pkt.kind))
         .filter(pkt => !pkt.derived && !pkt.internal && !pkt.lowLevel)
-    if (regs?.length) r.push("## Registers", "")
+    if (regs?.length) {
+        r.push(
+            "## Registers",
+            "",
+            `{@import optional ../clients-custom/${info.shortId}-registers.mdp}`,
+            ""
+        )
+    }
     regs.forEach(pkt => {
         const cmt = addComment(pkt)
         const nobuild = status === "stable" && !pkt.client ? "" : "skip"

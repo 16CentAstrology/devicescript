@@ -24,6 +24,10 @@ typedef struct {
     // ...
 } devs_gc_object_t;
 
+// this is either:
+// - devs_map_t
+// - devs_builtin_proto_t
+// - devs_service_spec_t
 struct devs_maplike {
     devs_gc_object_t _gc;
 };
@@ -107,6 +111,18 @@ typedef struct {
     devs_buffer_t *payload;
 } devs_packet_t;
 
+typedef struct {
+    devs_gc_object_t gc;
+    devs_small_size_t width;
+    devs_small_size_t height;
+    devs_small_size_t stride;
+    uint8_t bpp;
+    uint8_t read_only;
+    uint8_t *pix;
+    devs_buffer_t *buffer;
+    devs_map_t *attached;
+} devs_gimage_t;
+
 void devs_map_set(devs_ctx_t *ctx, devs_map_t *map, value_t key, value_t v);
 value_t devs_map_get(devs_ctx_t *ctx, devs_map_t *map, value_t key);
 int devs_map_delete(devs_ctx_t *ctx, devs_map_t *map, value_t key);
@@ -179,6 +195,7 @@ typedef struct _devs_gc_t devs_gc_t;
 devs_map_t *devs_map_try_alloc(devs_ctx_t *ctx, devs_maplike_t *proto);
 devs_short_map_t *devs_short_map_try_alloc(devs_ctx_t *ctx);
 devs_array_t *devs_array_try_alloc(devs_ctx_t *ctx, unsigned size);
+devs_buffer_t *devs_buffer_try_alloc_init(devs_ctx_t *ctx, const void *data, unsigned size);
 devs_buffer_t *devs_buffer_try_alloc(devs_ctx_t *ctx, unsigned size);
 devs_string_t *devs_string_try_alloc(devs_ctx_t *ctx, unsigned size);
 devs_string_jmp_t *devs_string_jmp_try_alloc(devs_ctx_t *ctx, unsigned size, unsigned length);
@@ -245,6 +262,7 @@ void devs_gc_destroy(devs_gc_t *gc);
 #define DEVS_GC_TAG_SHORT_MAP 0xA
 #define DEVS_GC_TAG_PACKET 0xB
 #define DEVS_GC_TAG_STRING_JMP 0xC
+#define DEVS_GC_TAG_IMAGE 0xD
 #define DEVS_GC_TAG_BUILTIN_PROTO DEVS_GC_TAG_MASK // these are not in GC heap!
 #define DEVS_GC_TAG_FINAL (DEVS_GC_TAG_MASK | DEVS_GC_TAG_MASK_PINNED)
 
@@ -282,3 +300,26 @@ void *devs_value_to_gc_obj(devs_ctx_t *ctx, value_t v);
 // returns pointer to a static buffer!
 const char *devs_show_value(devs_ctx_t *ctx, value_t v);
 void devs_log_value(devs_ctx_t *ctx, const char *lbl, value_t v);
+
+// sync with image_spi.ts
+#define DEVS_GIMAGE_XFER_MODE_MASK 0x000f
+#define DEVS_GIMAGE_XFER_MODE_MONO 0x0000
+#define DEVS_GIMAGE_XFER_MODE_565 0x0001
+#define DEVS_GIMAGE_XFER_MODE_MONO_REV 0x0002
+
+#define DEVS_GIMAGE_XFER_ORDER_MASK 0x10000
+#define DEVS_GIMAGE_XFER_BY_COL 0x00000
+#define DEVS_GIMAGE_XFER_BY_ROW 0x10000
+
+typedef struct {
+    devs_gimage_t *image;
+    uint32_t flags;
+    uint16_t buffer_size;
+    uint16_t buffer_offset;
+    uint16_t x, y;
+    uint8_t data[];
+} devs_gimage_xfer_state_t;
+devs_gimage_xfer_state_t *devs_gimage_prep_xfer(devs_ctx_t *ctx, devs_gimage_t *img,
+                                                value_t palette, uint32_t flags, unsigned max_buf);
+int devs_gimage_compute_xfer(devs_ctx_t *ctx, devs_gimage_xfer_state_t *state);
+devs_gimage_t *devs_to_gimage(devs_ctx_t *ctx, value_t s);

@@ -33,6 +33,8 @@ interface Object {
 
 interface ObjectConstructor {
     (): any
+    (value?: any): Object
+    new (value?: any): Object
 
     /**
      * Copy the values of all of the enumerable own properties from one or more source objects to a
@@ -115,8 +117,70 @@ interface String {
     /** Returns the length of a String object. */
     readonly length: number
 
+    /** Returns the length in bytes of UTF8 encoding of a String object. */
+    readonly byteLength: number
+
     [Symbol.iterator](): IterableIterator<string>
     readonly [index: number]: string
+
+    /**
+     * Returns the position of the first occurrence of a substring.
+     * When `endPosition < position` the search if performed in reverse.
+     * @param searchString The substring to search for in the string
+     * @param position The index at which to begin searching the String object. If omitted, search starts at the beginning of the string.
+     * @param endPosition `position <= return_value < endPosition || return_value == -1` (and `endPosition < 0` has special meaning)
+     */
+    indexOf(
+        searchString: string,
+        position?: number,
+        endPosition?: number
+    ): number
+
+    /**
+     * Returns the last occurrence of a substring in the string.
+     * @param searchString The substring to search for.
+     * @param position The index at which to begin searching. If omitted, the search begins at the end of the string.
+     */
+    lastIndexOf(searchString: string, position?: number): number
+
+    /**
+     * Returns true if searchString appears as a substring of the result of converting this
+     * object to a String, at one or more positions that are
+     * greater than or equal to position; otherwise, returns false.
+     * @param searchString search string
+     * @param position If position is undefined, 0 is assumed, so as to search all of the String.
+     */
+    includes(searchString: string, position?: number): boolean
+
+    /**
+     * Returns true if the sequence of elements of searchString converted to a String is the
+     * same as the corresponding elements of this object (converted to a String) starting at
+     * endPosition – length(this). Otherwise returns false.
+     */
+    endsWith(searchString: string, endPosition?: number): boolean
+
+    /**
+     * Returns true if the sequence of elements of searchString converted to a String is the
+     * same as the corresponding elements of this object (converted to a String) starting at
+     * position. Otherwise returns false.
+     */
+    startsWith(searchString: string, position?: number): boolean
+
+    /** Converts all the alphabetic characters in a string to lowercase. Currently ASCII-only. */
+    toLowerCase(): string
+
+    /** Converts all the alphabetic characters in a string to uppercase. Currently ASCII-only. */
+    toUpperCase(): string
+
+    /** Removes the leading and trailing white space and line terminator characters from a string. */
+    trim(): string
+
+    /**
+     * Split a string into substrings using the specified separator and return them as an array.
+     * @param separator A string that identifies character or characters to use in separating the string. If omitted, a single-element array containing the entire string is returned.
+     * @param limit A value used to limit the number of elements returned in the array.
+     */
+    split(separator: string, limit?: number): string[]
 }
 
 interface StringConstructor {
@@ -150,6 +214,12 @@ interface Array<T> {
     length: number
     [n: number]: T
     [Symbol.iterator](): IterableIterator<T>
+
+    /**
+     * Returns the item located at the specified index.
+     * @param index The zero-based index of the desired code unit. A negative index will count back from the last item.
+     */
+    at(index: number): T | undefined
 
     /**
      * Insert `count` `undefined` elements at `index`.
@@ -190,6 +260,12 @@ interface Array<T> {
     lastIndexOf(searchElement: T, fromIndex?: number): number
 
     /**
+     * Reverses the elements in an array in place.
+     * This method mutates the array and returns a reference to the same array.
+     */
+    reverse(): T[]
+
+    /**
      * Returns a copy of a section of an array.
      * For both start and end, a negative index can be used to indicate an offset from the end of the array.
      * For example, -2 refers to the second to last element of the array.
@@ -207,6 +283,16 @@ interface Array<T> {
      * which is coercible to the Boolean value false, or until the end of the array.
      */
     every(predicate: (value: T, index: number, array: T[]) => unknown): boolean
+
+    /**
+     * Changes all array elements from `start` to `end` index to a static `value` and returns the modified array
+     * @param value value to fill array section with
+     * @param start index to start filling the array at. If start is negative, it is treated as
+     * length+start where length is the length of the array.
+     * @param end index to stop filling the array at. If end is negative, it is treated as
+     * length+end.
+     */
+    fill(value: number, start?: number, end?: number): this
 
     /**
      * Determines whether the specified callback function returns true for any element of an array.
@@ -249,6 +335,47 @@ interface Array<T> {
      * immediately returns that element value. Otherwise, find returns undefined.
      */
     find(predicate: (value: T, index: number, array: T[]) => unknown): T
+
+    /**
+     * Returns the index of the first element in the array where predicate is true, and -1
+     * otherwise.
+     * @param predicate find calls predicate once for each element of the array, in ascending
+     * order, until it finds one where predicate returns true. If such an element is found,
+     * findIndex immediately returns that element index. Otherwise, findIndex returns -1.
+     */
+    findIndex(predicate: (value: T, index: number, obj: T[]) => unknown): number
+
+    /**
+     * Returns the value of the last element in the array where predicate is true, and undefined
+     * otherwise.
+     * @param predicate findLast calls predicate once for each element of the array, in descending
+     * order, until it finds one where predicate returns true. If such an element is found, findLast
+     * immediately returns that element value. Otherwise, findLast returns undefined.
+     */
+    findLast(
+        predicate: (value: T, index: number, array: T[]) => unknown
+    ): T | undefined
+
+    /**
+     * Returns the index of the last element in the array where predicate is true, and -1
+     * otherwise.
+     * @param predicate findLastIndex calls predicate once for each element of the array, in descending
+     * order, until it finds one where predicate returns true. If such an element is found,
+     * findLastIndex immediately returns that element index. Otherwise, findLastIndex returns -1.
+     */
+    findLastIndex(
+        predicate: (value: T, index: number, array: T[]) => unknown
+    ): number
+
+    /**
+     * Returns a new array with the element at the given index replaced with the given value.
+     * @param index The zero-based index at which to change the array, converted to an integer.
+     *              If index is negative, index + array.length is used.
+     * @param value Any value to be assigned to the given index.
+     * @returns A new array with the element at the specified index replaced with the given value.
+     * @throws {RangeError} If index is out of bounds (index >= array.length or index < -array.length).
+     */
+    with(index: number, value: T): T[]
 
     /**
      * Calls the specified callback function for all the elements in an array. The return value of the callback function is the accumulated result, and is provided as an argument in the next call to the callback function.
@@ -297,12 +424,38 @@ interface Array<T> {
      * @param separator A string used to separate one element of the array from the next in the resulting string. If omitted, the array elements are separated with a comma.
      */
     join(separator?: string): string
+
+    /**
+     * Sorts an array in place using insertion sort -> O(n^2) complexity.
+     * This method mutates the array and returns a reference to the same array.
+     * @param compareFn Function used to determine the order of the elements. It is expected to return
+     * a negative value if the first argument is less than the second argument, zero if they're equal, and a positive
+     * value otherwise. If omitted, the elements are sorted in ascending, ASCII character order.
+     * ```ts
+     * [11,2,22,1].sort((a, b) => a - b)
+     * ```
+     */
+    sort(compareFn?: (a: T, b: T) => number): this
+
+    /**
+     * Returns an iterable of keys in the array
+     */
+    keys(): IterableIterator<number>;
 }
 
 interface ArrayConstructor {
+    new (arrayLength?: number): any[]
+    new <T>(arrayLength: number): T[]
+    new <T>(...items: T[]): T[]
+
+    (arrayLength?: number): any[]
+    <T>(...items: T[]): T[]
+
+    <T>(arrayLength: number): T[]
     isArray(arg: any): arg is any[]
     readonly prototype: any[]
 }
+
 declare var Array: ArrayConstructor
 
 declare namespace console {
@@ -441,6 +594,32 @@ interface Math {
      * @param x A numeric expression.
      */
     log2(x: number): number
+
+    /**
+     * Maps value from the [`originalMin`, `originalMax`] interval to the [`newMin`, `newMax`] interval.
+     * @param value Value to map
+     * @param originalMin Original interval minimum
+     * @param originalMax Original interval maximum
+     * @param newMin New interval minimum
+     * @param newMax New interval maximum
+     * @returns mapped value
+     */
+    map(
+        value: number,
+        originalMin: number,
+        originalMax: number,
+        newMin: number,
+        newMax: number
+    ): number
+
+    /**
+     * Constrains a number to be within a range.
+     * @param value value to constrain
+     * @param min minimum limit
+     * @param max maximum limit
+     * @returns constrained value
+     */
+    constrain(value: number, min: number, max: number): number
 }
 /** An intrinsic object that provides basic mathematics functionality and constants. */
 declare var Math: Math

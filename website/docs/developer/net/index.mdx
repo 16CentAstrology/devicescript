@@ -1,0 +1,78 @@
+---
+title: Network and Sockets
+sidebar_position: 14
+---
+
+# Network
+
+DeviceScript supports TCP, TLS, MQTT and HTTP/HTTPS sockets on specific [devices](/devices).
+
+:::note Limitations
+
+-   Only one socket can be open at a time. On most devices, a TLS will use a large part of the usable memory.
+-   Sockets can be connect to server but not listen so it is not possible to implement a HTTP server currently.
+
+:::
+
+## fetch
+
+DeviceScript provides the familiar `fetch` function to issue HTTP/HTTPS requests.
+`fetch` is designed to match the browser [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API).
+
+```ts
+import { fetch } from "@devicescript/net"
+
+const res = await fetch(`https://github.com/status.json`)
+const body = await res.json()
+console.log(`GitHub is ${body.status}`)
+```
+
+:::tip
+
+The [fetch sources](https://github.com/microsoft/devicescript/blob/main/packages/net/src/fetch.ts)
+can help you with understanding how to use sockets.
+
+:::
+
+## encryptedFetch
+
+The [encryptedFetch](/developer/net/encrypted-fetch) function lets you
+HTTP POST encrypted data and read encrypted responses using symmetric encryption
+(AES-256-CCM).
+
+## MQTT client
+
+The [startMQTTClient](/developer/net/mqtt) function connects to a MQTT broker using TCP or TLS.
+
+```ts
+import { startMQTTClient } from "@devicescript/net"
+
+const mqtt = await startMQTTClient({
+    host: "broker.hivemq.com",
+    proto: "tcp",
+    port: 1883,
+})
+await mqtt.publish("devs/log", "hello!")
+```
+
+## TCP/TLS Sockets
+
+The `connect` function to open a socket TCP or TLS socket.
+
+This example issues is HTTPS request to the Github.com status API.
+
+```ts
+import { connect } from "@devicescript/net"
+
+const socket = await connect({ proto: "tls", host: "github.com", port: 443 })
+await socket.send(`GET /status.json HTTP/1.1
+user-agent: DeviceScript fetch()
+accept: */*
+host: github.com
+connection: close
+
+`)
+const status = await socket.readLine()
+console.log(status)
+await socket.close()
+```

@@ -1,0 +1,75 @@
+---
+sidebar_position: 10000
+title: Errors
+description: Troubleshooting DeviceScript errors
+---
+
+# Errors
+
+## loopback rx ovf {#loopback-rx-ovf}
+
+The program is issuing requests to service client faster than the system can handle.
+
+## can't connect, no HF2 nor JDUSB {#no-hf2}
+
+On ESP32-C3, we do not support external serial chips. This is the [list of known supported ESP32 boards](/devices/esp32).
+
+## esptool cannot connect {#esptool-cannot-connect}
+
+If the `esptool` complains about not being able to connect, try plugging your board in
+while holding `IO0`/`BOOT` button.
+
+## I2C device not found or malfunctioning {#i2c-device-not-found-or-malfunctioning}
+
+There is a number of reasons why this error message will appear. A few common ones
+are due to invalid configurations, aside from hardware issues with the sensor.
+
+-   Check that the I2C pins have been configured. Read about [board configuration](/developer/board-configuration).
+-   The I2C address is incorrect. Check the datasheet for the correct address.
+-   The I2C address is correct, but the sensor is not responding. Check the wiring and the sensor datasheet.
+
+## Unable to locate Node.JS. {#terminal-nodemissing}
+
+The Visual Studio Code extension was unable to determine the version of Node.JS.
+This may mean that Node.JS is not installed or not in the path,
+the local installation of modules is broken.
+
+You can try to run npm update in the folder and try again.
+
+```bash npm2yarn
+npm update
+```
+
+## Install @devicescript/cli package {#terminal-notinstalled}
+
+The Visual Studio Code extension tries to locate the
+CLI script, `./node_modules/.bins/devicescript`, that gets installed by the package manager.
+
+If this file is not present, it typically means that the CLI is not installed in the project
+and needs to be added as `devDependency`.
+
+-   click **Install** to install @devicescript/cli
+-   try running `npm update` or `yarn update` to fix the installation
+
+## missing "devicescript" section {#missing-devicescript-section}
+
+Importing a npm package designed for node.js or the browser is not yet supported. The reason is that it would most likely not work
+as the DeviceScript runtime environment is radically different from the browser or even node.js.
+
+Instead you should try to import packages [specifically built for devicescript](/developer/packages/custom).
+
+## No DeviceScript device found. {#no-devicescript-device-found}
+
+DeviceScript is trying to deploy bytecode but it cannot find any connected DeviceScript device.
+Make sure that your device is actively connected either through the connection helper page or through native transports (USB, Serial).
+
+## Multiple DeviceScript device found. {#multiple-devicescript-device-found}
+
+DeviceScript is trying to deploy bytecode but it found multiple connected DeviceScript devices. There should only be 1 connect device to deploy
+or the tool will give up.
+
+## error can't alloc pcb {#error-cant-alloc-pcb}
+
+TLS is not yet supported on RP2040.
+See [implementation status](https://microsoft.github.io/devicescript/devices#implementation-status)
+and [issue 664](https://github.com/microsoft/devicescript/issues/664).

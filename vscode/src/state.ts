@@ -18,26 +18,33 @@ import {
     CONNECTION_STATE,
     ConnectionState,
     JDDevice,
-    serviceSpecificationFromClassIdentifier,
+    DEVICE_ANNOUNCE,
 } from "jacdac-ts"
 import * as vscode from "vscode"
 import { Utils } from "vscode-uri"
 import {
     AddResponse,
+    SideAddNpmReq,
+    SideAddNpmResp,
     SideAddServiceReq,
     SideAddServiceResp,
+    SideAddSettingsReq,
+    SideAddSettingsResp,
     SideAddSimReq,
     SideAddSimResp,
+    SideAddTestReq,
+    SideAddTestResp,
     SideConnectReq,
+    SideMissingPackageEvent,
     SideStartVmReq,
     SideStopVmReq,
     SideTransportEvent,
     TransportStatus,
 } from "../../cli/src/sideprotocol"
-import { openDocUri } from "./commands"
+import { openDocUri, showInformationMessageWithHelp } from "./commands"
 import { CONNECTION_RESOURCE_GROUP } from "./constants"
 import { prepareForDeploy, readRuntimeVersion } from "./deploy"
-import { DeveloperToolsManager } from "./devtoolsserver"
+import { DeveloperToolsManager, resolveDevtoolsPath } from "./devtoolsserver"
 import { checkFileExists, openFileEditor, writeFile } from "./fs"
 import { sideRequest, subSideEvent } from "./jacdac"
 import { JDomDeviceTreeItem } from "./JDomTreeDataProvider"
@@ -45,6 +52,7 @@ import { showConfirmBox, TaggedQuickPickItem } from "./pickers"
 import { SimulatorsWebView } from "./simulatorWebView"
 import { showErrorMessage } from "./telemetry"
 import _serverInfo from "./server-info.json"
+import { resolvePythonEnvironment } from "./python"
 
 const serverInfo = _serverInfo as ServerInfoFile
 
@@ -59,6 +67,11 @@ export interface NodeWatch {
     label: string
     icon: string
 }
+
+export type ServerQuickPickItem = TaggedQuickPickItem<{
+    command: "test" | "settings" | "search" | "server" | "sim" | "npm"
+    info?: ServerInfo
+}>
 
 export class DeviceScriptExtensionState extends JDEventSource {
     readonly devtools: DeveloperToolsManager
@@ -82,6 +95,7 @@ export class DeviceScriptExtensionState extends JDEventSource {
         this.bus.on([DEVICE_CHANGE, CONNECTION_STATE], () => {
             this.emit(CHANGE)
         })
+        this.bus.on(DEVICE_ANNOUNCE, this.handleDeviceAnnounce.bind(this))
         this.devtools.on(CHANGE, () => this.emit(CHANGE))
         subSideEvent<SideTransportEvent>("transport", msg => {
             const _transport = msg.data
@@ -91,6 +105,23 @@ export class DeviceScriptExtensionState extends JDEventSource {
                 this._transport = _transport
                 this.emit(CHANGE)
             }
+        })
+        subSideEvent<SideMissingPackageEvent>("missingPackage", async msg => {
+            const { packageName } = msg.data
+            const projectFolder = this.projectFolder
+            const install = "Install"
+            const res = await showErrorMessage(
+                "package.missing",
+                `Failed to require '${packageName}' package. Please install and try again.`,
+                install
+            )
+            if (res === install)
+                await this.devtools.startPackageTool(
+                    projectFolder,
+                    `Installing ${packageName}...`,
+                    "install",
+                    packageName
+                )
         })
     }
 
@@ -149,11 +180,37 @@ export class DeviceScriptExtensionState extends JDEventSource {
         return this.deviceScriptManager || this.pickDeviceScriptManager(options)
     }
 
+    async addTest() {
+        const resp = await sideRequest<SideAddTestReq, SideAddTestResp>({
+            req: "addTest",
+            data: {},
+        })
+        await this.handleAddResponse(resp.data)
+    }
+
     async addSim() {
         const resp = await sideRequest<SideAddSimReq, SideAddSimResp>({
             req: "addSim",
             data: {},
         })
+        await this.handleAddResponse(resp.data)
+    }
+
+    async addNpm() {
+        const resp = await sideRequest<SideAddNpmReq, SideAddNpmResp>({
+            req: "addNpm",
+            data: {},
+        })
+        await this.handleAddResponse(resp.data)
+    }
+
+    async addSettings() {
+        const resp = await sideRequest<SideAddSettingsReq, SideAddSettingsResp>(
+            {
+                req: "addSettings",
+                data: {},
+            }
+        )
         await this.handleAddResponse(resp.data)
     }
 
@@ -257,7 +314,7 @@ export class DeviceScriptExtensionState extends JDEventSource {
         const content = JSON.stringify(newBoard, null, 4)
         await writeFile(
             this.devtools.projectFolder,
-            `./boards/${normalize(board)}.json`,
+            `./boards/${normalize(board)}.board.json`,
             content,
             { open: true }
         )
@@ -317,7 +374,7 @@ export class DeviceScriptExtensionState extends JDEventSource {
                 matchOnDescription: true,
             }
         )
-        if (!res) return // user escaped
+        if (!res) return undefined // user escaped
 
         if (!res.data?.board) {
             openDocUri("devices")
@@ -330,12 +387,10 @@ export class DeviceScriptExtensionState extends JDEventSource {
     async configureHardware(editor: vscode.TextEditor) {
         await this.devtools.start()
         if (!this.devtools.connected) return
-        const { boards } = this.devtools
-
-        const document = editor.document
         await this.devtools.refreshSpecs()
 
-        // first identify the board
+        const { boards } = this.devtools
+        const document = editor.document
         const { boardimport } =
             /from "@dsboard\/(?<boardimport>[^"]+)/.exec(document.getText())
                 ?.groups || {}
@@ -354,27 +409,71 @@ export class DeviceScriptExtensionState extends JDEventSource {
                     `import { pins, board } from "@dsboard/${board.id}"\n`
                 )
             })
+            showInformationMessageWithHelp(
+                `Imported ${board.devName} configuration`,
+                "developer/board-configuration"
+            )
+            return
         }
 
+        await this.showQuickAddFeatureOrDriver(editor)
+    }
+
+    private async handleDeviceAnnounce(dev: JDDevice) {
+        // ignore simulator
+        if (dev.deviceId === this.simulatorScriptManagerId) return
+        // only handle devices that have a script manager
+        if (!dev.hasService(SRV_DEVICE_SCRIPT_MANAGER)) return
+        // check if a simulator is running
+        if (!this.bus.device(this.simulatorScriptManagerId, true)) return
+        // stop simulator and let other manager take over
+        await this.stopSimulator()
+    }
+
+    private async showQuickAddFeatureOrDriver(editor: vscode.TextEditor) {
         const server = await vscode.window.showQuickPick(
             [
+                {
+                    label: "Drivers",
+                    kind: vscode.QuickPickItemKind.Separator,
+                },
                 ...serverInfo.servers.map(
                     e =>
-                        <TaggedQuickPickItem<ServerInfo>>{
+                        <ServerQuickPickItem>{
                             label: e.label,
                             description: e.startName,
                             detail: e.detail,
-                            data: e,
+                            data: { info: e, command: "server" },
                         }
                 ),
-                <TaggedQuickPickItem<ServerInfo>>{
+                <ServerQuickPickItem>{
                     label: "Search...",
                     description: "npmjs.com",
                     detail: "Search for packages on npmjs.com with the `devicescript` keyword.",
+                    data: { command: "search" },
+                },
+                {
+                    label: "Features",
+                    kind: vscode.QuickPickItemKind.Separator,
+                },
+                <ServerQuickPickItem>{
+                    label: "Add device settings and secrets",
+                    detail: "Add .env.default and .env.local files to store configuration settings and secrets.",
+                    data: { command: "settings" },
+                },
+                <ServerQuickPickItem>{
+                    label: "Add tests",
+                    detail: "Add a test file to run tests on your device.",
+                    data: { command: "test" },
+                },
+                <ServerQuickPickItem>{
+                    label: "Convert to NPM package",
+                    detail: "Update package.json to support publishing as a library on npm.js.",
+                    data: { command: "npm" },
                 },
             ],
             {
-                title: `Pick a driver to start`,
+                title: `Configure project`,
                 matchOnDescription: true,
                 matchOnDetail: true,
                 canPickMany: false,
@@ -382,14 +481,18 @@ export class DeviceScriptExtensionState extends JDEventSource {
         )
         if (server === undefined) return
 
-        if (server.data) await this.addStartServer(editor, server.data)
-        // npm
-        else
-            vscode.env.openExternal(
+        const { command, info } = server.data
+        if (command === "server") await this.addStartServer(editor, info)
+        else if (command === "search")
+            await vscode.env.openExternal(
                 vscode.Uri.parse(
                     "https://www.npmjs.com/search?q=keywords%3Adevicescript"
                 )
             )
+        else if (command === "test") await this.addTest()
+        else if (command === "settings") await this.addSettings()
+        else if (command === "sim") await this.addSim()
+        else if (command === "npm") await this.addNpm()
     }
 
     // find first line that is not an import, comment or empty
@@ -470,12 +573,12 @@ export class DeviceScriptExtensionState extends JDEventSource {
         })
     }
 
-    async flashFirmware(device?: JDDevice) {
+    private async resolveBoardDefinition(device?: JDDevice) {
         await this.devtools.start()
-        if (!this.devtools.connected) return
+        if (!this.devtools.connected) return undefined
         await this.devtools.refreshSpecs()
         const { boards } = this.devtools
-        if (!boards?.length) return
+        if (!boards?.length) return undefined
 
         const productIdentifier = await device?.resolveProductIdentifier()
         let board: DeviceConfig =
@@ -488,9 +591,45 @@ export class DeviceScriptExtensionState extends JDEventSource {
                 "What kind of device are you flashing?",
                 { useUniqueDevice: true }
             )
-            if (!board) return
+            if (!board) return undefined
         }
+        return board
+    }
 
+    async cleanFirmware(device?: JDDevice) {
+        if (
+            !(await showConfirmBox(
+                `The entire flash will be erased. There is NO undo. Confirm?`
+            ))
+        )
+            return
+
+        const board = await this.resolveBoardDefinition(device)
+        if (!board) return
+
+        // force disconnect
+        await this.disconnect()
+
+        const { id } = board
+        const args = ["flash", "--board", id, "--install", "--clean"]
+        if (this.isRemote) args.push("--remote")
+        const python = await resolvePythonEnvironment()
+        if (python) args.push("--python", python.path)
+        const t = await this.devtools.createCliTerminal({
+            title: "DeviceScript Flasher",
+            progress: "Starting flashing tools...",
+            useShell: true,
+            args,
+            diagnostics: false,
+        })
+        t.show()
+    }
+
+    async flashFirmware(device?: JDDevice) {
+        const board = await this.resolveBoardDefinition(device)
+        if (!board) return
+
+        // same host flow
         if (
             !(await showConfirmBox(
                 `DeviceScript runtime will be flashed on your ${board.devName}. There is NO undo. Confirm?`
@@ -502,11 +641,15 @@ export class DeviceScriptExtensionState extends JDEventSource {
         await this.disconnect()
 
         const { id } = board
+        const args = ["flash", "--board", id, "--refresh", "--install"]
+        if (this.isRemote) args.push("--remote")
+        const python = await resolvePythonEnvironment()
+        if (python) args.push("--python", python.path)
         const t = await this.devtools.createCliTerminal({
             title: "DeviceScript Flasher",
             progress: "Starting flashing tools...",
             useShell: true,
-            args: ["flash", "--board", id],
+            args,
             diagnostics: false,
         })
         t.show()
@@ -524,45 +667,50 @@ export class DeviceScriptExtensionState extends JDEventSource {
         })
     }
 
-    async connect() {
-        const { simulatorScriptManagerId } = this
+    get isRemote() {
+        const config = vscode.workspace.getConfiguration("devicescript.connect")
         const { extensionKind } = this.context.extension
-        const isWorkspace = extensionKind === vscode.ExtensionKind.Workspace
-        if (isWorkspace) {
-            showErrorMessage(
-                "connection.remote",
-                "Connection to a hardware device (serial, usb, ...) is not supported in remote workspaces."
-            )
-            return
-        }
+        return (
+            extensionKind === vscode.ExtensionKind.Workspace ||
+            !!config.get("web")
+        )
+    }
 
+    async connect() {
         await this.devtools.start()
         if (!this.devtools.connected) return
 
+        const { simulatorScriptManagerId, isRemote } = this
         const { transports } = this.transport
         const connecteds = transports.filter(
             tr => tr.connectionState === ConnectionState.Connected
         )
-        const serial = transports.find(t => t.type === "serial")
-        const usb = transports.find(t => t.type === "usb")
         const sim = !!this.bus.device(this.simulatorScriptManagerId, true)
-        const items: (vscode.QuickPickItem & { transport?: string })[] = [
-            {
+        let items: (vscode.QuickPickItem & { transport?: string })[] = []
+        items.push({
+            label: "Hardware Connections",
+            kind: vscode.QuickPickItemKind.Separator,
+        })
+        if (isRemote) {
+            items.push({
+                transport: "web",
+                label: "WebSerial/WebUSB",
+                detail: "ESP32, RP2040, ...",
+                description:
+                    "Connect through an external web page running client side.",
+            })
+        } else {
+            const serial = transports.find(t => t.type === "serial")
+            items.push({
                 transport: "serial",
                 label: "Serial",
                 detail: "ESP32, RP2040, ...",
                 description: serial
                     ? `${serial.description || ""}(${serial.connectionState})`
                     : "",
-            },
-            {
-                transport: "usb",
-                label: "USB",
-                detail: "micro:bit",
-                description: usb
-                    ? `${usb.description || ""}(${usb.connectionState})`
-                    : "",
-            },
+            })
+        }
+        items.push(
             !!connecteds.length && {
                 transport: "none",
                 label: "Disconnect",
@@ -571,7 +719,7 @@ export class DeviceScriptExtensionState extends JDEventSource {
                     .join(", ")}`,
             },
             !sim && {
-                label: "",
+                label: "Simulator",
                 kind: vscode.QuickPickItemKind.Separator,
             },
             !sim && {
@@ -579,23 +727,15 @@ export class DeviceScriptExtensionState extends JDEventSource {
                 description: `Simulator`,
                 detail: `A virtual DeviceScript interpreter running in a separate process.`,
                 transport: simulatorScriptManagerId,
-            },
-            {
-                label: "",
-                kind: vscode.QuickPickItemKind.Separator,
-            },
-            {
-                label: "Flash Firmware...",
-                transport: "flash",
-                detail: "Flash the DeviceScript runtime on new devices.",
-            },
-        ].filter(m => !!m)
+            }
+        )
+        items = items.filter(m => !!m)
         const res = await vscode.window.showQuickPick(items, {
             title: "Pick a DeviceScript connection",
         })
         if (res === undefined || !res.transport) return
 
-        if (res.transport === "flash") await this.flashFirmware()
+        if (res.transport === "web") await this.openExternalConnect()
         else if (res.transport === simulatorScriptManagerId)
             await this.startSimulator()
         else
@@ -607,6 +747,11 @@ export class DeviceScriptExtensionState extends JDEventSource {
                     resourceGroupId: CONNECTION_RESOURCE_GROUP,
                 },
             })
+    }
+
+    private async openExternalConnect() {
+        const connectUri = await resolveDevtoolsPath(`connect`)
+        await vscode.env.openExternal(connectUri)
     }
 
     async startSimulator(clearFlash?: boolean) {
@@ -804,5 +949,23 @@ export class DeviceScriptExtensionState extends JDEventSource {
                 service.device.deviceId
             )
         return service
+    }
+
+    async runFile(file: vscode.Uri, options?: { debug?: boolean }) {
+        if (!file) return
+        const folder = vscode.workspace.getWorkspaceFolder(file)
+        if (!folder) return
+
+        const { debug } = options || {}
+        await vscode.debug.startDebugging(folder, {
+            type: "devicescript",
+            request: "launch",
+            name: "DeviceScript: Run File",
+            stopOnEntry: false,
+            noDebug: !debug,
+            program: file.path,
+        } as vscode.DebugConfiguration)
+        if (!debug)
+            vscode.commands.executeCommand("extension.devicescript.jdom.focus")
     }
 }

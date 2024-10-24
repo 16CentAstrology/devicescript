@@ -1,3 +1,13 @@
+---
+description: Learn how to use the hex template literal in JavaScript to create a
+  Buffer from a hex string and store it in flash memory.
+keywords:
+  - hex template literal
+  - JavaScript
+  - Buffer
+  - hex string
+  - flash memory
+---
 # Hex template literal
 
 The `hex` template literal is a builtin template literal that can be used to create a `Buffer` from a hex string.
@@ -5,4 +15,13 @@ The buffer is stored in flash.
 
 ```js
 const buf: Buffer = hex`00 ab 12 2f 00`
+```
+
+Comments and whitespace are allowed in `hex` literals:
+
+```ts
+const commentedData: Buffer = hex`
+01 02 03 // first three numbers
+ff aa    // two more bytes
+`
 ```

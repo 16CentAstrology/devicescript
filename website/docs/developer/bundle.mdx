@@ -1,0 +1,40 @@
+---
+title: Bundled firmware
+sidebar_position: 20
+---
+
+# Bundled Firmware
+
+A firmware image can be bundled together with a DeviceScript program and settings
+into a single image that can be flashed at once
+using the platform native tools.Ï
+
+Let's assume you're developing for `seeed_xiao_esp32c3` board.
+Inside your project folder run using the [CLI](/api/cli):
+
+```bash
+devs bundle --board seeed_xiao_esp32c3 src/main.ts
+```
+
+This will bundle the program from `src/main.ts` as well as any [settings](/developer/settings)
+in `.env` and `.env.local` files.
+
+You should get something similar to the following:
+
+```console
+...
+deploy to ZX81
+  --> done, 4kb
+fetch https://github.com/microsoft/devicescript-esp32/releases/latest/download/devicescript-esp32c3-seeed_xiao_esp32c3-0x0.bin
+saved .devicescript/cache/devicescript-esp32c3-seeed_xiao_esp32c3-0x0.bin 1277952 bytes
+writing 1875968 bytes to .devicescript/bin/bundle-devicescript-esp32c3-seeed_xiao_esp32c3-0x0.bin
+```
+
+The file `.devicescript/bin/bundle-devicescript-esp32c3-seeed_xiao_esp32c3-0x0.bin` can be now flashed
+to the device.
+You can do it using `esptool` or in case of Pico by just copying the `.UF2` file.
+Or use `devs flash --file` command:
+
+```bash
+devs flash --board seeed_xiao_esp32c3 --file .devicescript/bin/bundle-devicescript-esp32c3-seeed_xiao_esp32c3-0x0.bin
+```

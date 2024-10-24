@@ -22,8 +22,17 @@ __attribute__((format(printf, 1, 2))) void app_dmesg(const char *format, ...);
 #ifdef __EMSCRIPTEN__
 #define JD_LSTORE 0
 #define JD_NET_BRIDGE 0
+#define JD_EM_WEBSOCKET 0
+
+#if JD_EM_WEBSOCKET
 #define JD_WEBSOCK_IMPL 0
+#define JD_USER_SOCKET 0
+#define JD_EM_NODEJS_SOCKET 0
 #else
+#define JD_EM_NODEJS_SOCKET 1
+#endif
+
+#else // not emcc
 #define JD_LSTORE 1
 #define JD_LSTORE_FF 0
 #define JD_LSTORE_FILE_SIZE (4 * 1024 * 1024)
@@ -36,8 +45,10 @@ __attribute__((format(printf, 1, 2))) void app_dmesg(const char *format, ...);
 // #define JD_THR_PTHREAD 1
 
 extern uintptr_t flash_base_addr(void);
+extern uint32_t flash_size;
 #define JD_FSTOR_BASE_ADDR flash_base_addr()
-#define JD_SETTINGS_LARGE 1
+#define JD_FSTOR_TOTAL_SIZE flash_size
+#define JD_FSTOR_MAX_DATA_PAGES (512 / 4)
 
 extern const uint8_t jd_dcfg_array[];
 #define JD_DCFG_BASE_ADDR ((uintptr_t)jd_dcfg_array)

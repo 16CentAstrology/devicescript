@@ -28,6 +28,40 @@ void fun1_Array_isArray(devs_ctx_t *ctx) {
     devs_ret_bool(ctx, devs_is_array(ctx, devs_arg(ctx, 0)));
 }
 
+void methX_Array___ctor__(devs_ctx_t *ctx) {
+    // this is somewhat inefficient - the runtime allocates a map
+    value_t ignored = devs_arg_self(ctx);
+    (void)ignored;
+
+    unsigned size = 0;
+    int numargs = ctx->stack_top_for_gc - 1;
+    bool copy = false;
+
+    if (numargs >= 1) {
+        value_t arg0 = devs_arg(ctx, 0);
+        if (numargs == 1 && devs_is_number(arg0)) {
+            if (!devs_is_tagged_int(arg0)) {
+                devs_throw_range_error(ctx, "Invalid array length");
+                return;
+            }
+            size = devs_value_to_int(ctx, arg0);
+        } else {
+            size = numargs;
+            copy = true;
+        }
+    }
+
+    devs_array_t *arr = devs_array_try_alloc(ctx, size);
+    if (!arr)
+        return;
+    devs_ret_gc_ptr(ctx, arr);
+
+    if (copy)
+        for (int i = 0; i < numargs; ++i) {
+            devs_array_set(ctx, arr, i, devs_arg(ctx, i));
+        }
+}
+
 void methX_Array_push(devs_ctx_t *ctx) {
     devs_array_t *self = devs_arg_self_array(ctx);
     if (!self)
@@ -71,7 +105,7 @@ void methX_Array_slice(devs_ctx_t *ctx) {
     if (start < 0)
         start = 0;
 
-    int32_t end = numargs > 1 && !devs_is_undefined(devs_arg(ctx, 1)) ? devs_arg_int(ctx, 1) : len;
+    int32_t end = numargs > 1 ? devs_arg_int_defl(ctx, 1, len) : len;
 
     if (end < 0)
         end = len + end;

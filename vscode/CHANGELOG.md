@@ -2,6 +2,738 @@
 
 All notable changes to this project will be documented in this file. Dates are displayed in UTC.
 
+#### [v2.16.3](https://github.com/microsoft/devicescript/compare/v2.16.2...v2.16.3)
+
+> 19 April 2024
+
+- Grapebit fixes [`#690`](https://github.com/microsoft/devicescript/pull/690)
+- Update docs on required node version [`#681`](https://github.com/microsoft/devicescript/pull/681)
+- add permissions [`cd8a966`](https://github.com/microsoft/devicescript/commit/cd8a966ab1ebeb2575c0b4c8699a30f33b464bd1)
+- add consumer health link [`ef6f1a9`](https://github.com/microsoft/devicescript/commit/ef6f1a98d673908b4bd82543279b5c556eb9abcd)
+- added permissions [`ac09abd`](https://github.com/microsoft/devicescript/commit/ac09abd126421cae1d49f0d59ccc1c04306c9380)
+
+#### [v2.16.2](https://github.com/microsoft/devicescript/compare/v2.16.1...v2.16.2)
+
+> 31 January 2024
+
+- Update node version warning in devtoolsserver.ts [`#680`](https://github.com/microsoft/devicescript/pull/680)
+- sync devicescript-esp32 updates; fixes #679 [`#679`](https://github.com/microsoft/devicescript/issues/679)
+
+#### [v2.16.1](https://github.com/microsoft/devicescript/compare/v2.16.0...v2.16.1)
+
+> 10 January 2024
+
+- updated jacdac-specs [`e33ff6e`](https://github.com/microsoft/devicescript/commit/e33ff6e04929b9ae7dd8eff204665ab155fe5683)
+- updated jacdac-c [`75b5900`](https://github.com/microsoft/devicescript/commit/75b590088d3d21936f9b7e50df600c90969221aa)
+
+#### [v2.16.0](https://github.com/microsoft/devicescript/compare/v2.15.23...v2.16.0)
+
+> 2 January 2024
+
+- attempt at migrating to node 20 [`#673`](https://github.com/microsoft/devicescript/pull/673)
+- added rp2040 error message [`e63fe9e`](https://github.com/microsoft/devicescript/commit/e63fe9e000e5e02d053e000da7d10535e5110206)
+- switch quiet or verbose [`899a390`](https://github.com/microsoft/devicescript/commit/899a390d82ff2cdf3bdf9894f4c3ad461f2c9bf2)
+
+#### [v2.15.23](https://github.com/microsoft/devicescript/compare/v2.15.22...v2.15.23)
+
+> 13 December 2023
+
+- Added Number.parseInt [`#669`](https://github.com/microsoft/devicescript/pull/669)
+- updated yarn.lock [`693e2ec`](https://github.com/microsoft/devicescript/commit/693e2eca36fb677ced4714c3d99580f0af3b45e7)
+- add verbose flag [`4afe607`](https://github.com/microsoft/devicescript/commit/4afe6078ab688240370dbe9550508ca8225113a4)
+- updated .gitignore [`0e9d2d4`](https://github.com/microsoft/devicescript/commit/0e9d2d42bc710237d536a9a4c140c1cf6b595447)
+
+#### [v2.15.22](https://github.com/microsoft/devicescript/compare/v2.15.21...v2.15.22)
+
+> 5 December 2023
+
+- Add Number.parseFloat [`#668`](https://github.com/microsoft/devicescript/pull/668)
+- Number.isFinite [`#666`](https://github.com/microsoft/devicescript/pull/666)
+- Add Number.isSafeInteger [`#667`](https://github.com/microsoft/devicescript/pull/667)
+- updated ts/c [`5536f59`](https://github.com/microsoft/devicescript/commit/5536f593d177239fcb9928cefc2737e33634d5a3)
+
+#### [v2.15.21](https://github.com/microsoft/devicescript/compare/v2.15.20...v2.15.21)
+
+> 30 November 2023
+
+- Added Number.isNaN [`#665`](https://github.com/microsoft/devicescript/pull/665)
+- updated jacdac-ts [`bf5b846`](https://github.com/microsoft/devicescript/commit/bf5b8460f1fbad3c59d12fc3d251f1d188d6249c)
+
+#### [v2.15.20](https://github.com/microsoft/devicescript/compare/v2.15.19...v2.15.20)
+
+> 22 November 2023
+
+- Add ILI9341 driver support [`#663`](https://github.com/microsoft/devicescript/pull/663)
+- emit ds.Role._onPacket properly [`#659`](https://github.com/microsoft/devicescript/issues/659)
+- add --diff option to devs disasm [`e42e955`](https://github.com/microsoft/devicescript/commit/e42e955dc12a027088476e078212d3268135bd08)
+- add repro [`11be29c`](https://github.com/microsoft/devicescript/commit/11be29cd39b2beda01d16ecb5b1a40dcfc941f09)
+- add samples with accelerometer [`44fa373`](https://github.com/microsoft/devicescript/commit/44fa3734e873d2d4552b98ba55b7f5e26bbc63a4)
+
+#### [v2.15.19](https://github.com/microsoft/devicescript/compare/v2.15.18...v2.15.19)
+
+> 7 November 2023
+
+- avoid ./ as a name [`e5f8d1e`](https://github.com/microsoft/devicescript/commit/e5f8d1ed81fd9944f15f866f9b5afb93b026801a)
+- variant undefined fix [`f2bc66e`](https://github.com/microsoft/devicescript/commit/f2bc66e340dc2c0b8f0f70196ed06cd559a9c8ab)
+
+#### [v2.15.18](https://github.com/microsoft/devicescript/compare/v2.15.17...v2.15.18)
+
+> 6 November 2023
+
+- fix simulation for gyro/acc [`7129d81`](https://github.com/microsoft/devicescript/commit/7129d817c939db1d860c3a5676d6e1467ed5bb44)
+- missing newlines in docs [`a284989`](https://github.com/microsoft/devicescript/commit/a284989fa0e44e2ce1e2bd3b78a6a06b2f4cd848)
+- missing await [`3b8132b`](https://github.com/microsoft/devicescript/commit/3b8132babe4edbc30207a852b6a25e01651d1255)
+
+#### [v2.15.17](https://github.com/microsoft/devicescript/compare/v2.15.16...v2.15.17)
+
+> 6 November 2023
+
+- handle missing usb package [`#657`](https://github.com/microsoft/devicescript/pull/657)
+- Update PR for https://github.com/microsoft/devicescript/pull/653 [`#656`](https://github.com/microsoft/devicescript/pull/656)
+- Lint [`#654`](https://github.com/microsoft/devicescript/pull/654)
+- refactoring to handle require errors [`4372a14`](https://github.com/microsoft/devicescript/commit/4372a1464ed26dc3e8c9f0e7a7bafc6b2987948c)
+- more cli docs [`207858a`](https://github.com/microsoft/devicescript/commit/207858a274313a163347af0b8abf4402ff5f6836)
+- updated error messages [`53b3d2d`](https://github.com/microsoft/devicescript/commit/53b3d2d8044c539eeb1a007700241281c03ae85c)
+
+#### [v2.15.16](https://github.com/microsoft/devicescript/compare/v2.15.15...v2.15.16)
+
+> 27 October 2023
+
+- Typo fix in bytecode/bytecode.md [`#645`](https://github.com/microsoft/devicescript/pull/645)
+- Performance and Loading Speed Enhancements for the Website 🏎 [`#652`](https://github.com/microsoft/devicescript/pull/652)
+- allow larger images (depending on bpp): fixes #649 [`#649`](https://github.com/microsoft/devicescript/issues/649)
+- start dashboard in non-vscode mode [`a4b905d`](https://github.com/microsoft/devicescript/commit/a4b905d6097a7a1f7bc368171acff3775854e880)
+- formatting and update jacdac [`87974cc`](https://github.com/microsoft/devicescript/commit/87974cc914ab2a65dd821f42755f9ced2d806d50)
+- updated jacdac-ts [`4a71ef6`](https://github.com/microsoft/devicescript/commit/4a71ef61e885eda21d943ed2fdf375ac725cbb3b)
+
+#### [v2.15.15](https://github.com/microsoft/devicescript/compare/v2.15.14...v2.15.15)
+
+> 11 October 2023
+
+- slim date object [`#643`](https://github.com/microsoft/devicescript/pull/643)
+- always populate package.json name [`5f2d79c`](https://github.com/microsoft/devicescript/commit/5f2d79ca6d5ffed144395744acfae86390dd1c83)
+
+#### [v2.15.14](https://github.com/microsoft/devicescript/compare/v2.15.13...v2.15.14)
+
+> 9 October 2023
+
+- support for grove RGB LCD 16x2 [`#639`](https://github.com/microsoft/devicescript/pull/639)
+- added dummy lcd project [`79536d6`](https://github.com/microsoft/devicescript/commit/79536d62487324fb9c5002e7952749cfa09c02f6)
+- updated sample/multi support in lcd [`9dbda44`](https://github.com/microsoft/devicescript/commit/9dbda446e58a30c5f5cc742d8a26ca400fd05884)
+- updated xiao docs [`2f6cf19`](https://github.com/microsoft/devicescript/commit/2f6cf197b043f2344f16aeea452b0b74c3f9e41d)
+
+#### [v2.15.13](https://github.com/microsoft/devicescript/compare/v2.15.12...v2.15.13)
+
+> 3 October 2023
+
+- added rp2040 matrix example [`11d1f3d`](https://github.com/microsoft/devicescript/commit/11d1f3de52776aec0203a49dafa944f3240ffcf8)
+- added grape:bit driver [`7f91d62`](https://github.com/microsoft/devicescript/commit/7f91d6226b16ae3578adb267fec7a8dfdc5c914d)
+- added pixel matrix [`ce2734c`](https://github.com/microsoft/devicescript/commit/ce2734cbf228c4b3e9713ffe916acf4dec0edff4)
+
+#### [v2.15.12](https://github.com/microsoft/devicescript/compare/v2.15.11...v2.15.12)
+
+> 29 September 2023
+
+- Add da213b accelerator [`#632`](https://github.com/microsoft/devicescript/pull/632)
+- update boards [`c0304c1`](https://github.com/microsoft/devicescript/commit/c0304c1494bf7c090a56ac85a931307562f30501)
+- move new driver files, dedicated docs [`bb30df3`](https://github.com/microsoft/devicescript/commit/bb30df3d476ba8602e3d7062868da4d373c9b438)
+- fix build [`716bde7`](https://github.com/microsoft/devicescript/commit/716bde766224e18afe134d48b85c3c8cc375a81d)
+
+#### [v2.15.11](https://github.com/microsoft/devicescript/compare/v2.15.10...v2.15.11)
+
+> 27 September 2023
+
+- SH110X Driver + Documentation [`#631`](https://github.com/microsoft/devicescript/pull/631)
+- add new driver guilde [`c9ba0be`](https://github.com/microsoft/devicescript/commit/c9ba0be9293b5c3b5384877d9786bbb31a1fbe4c)
+- added links [`185c34e`](https://github.com/microsoft/devicescript/commit/185c34ec1dcaf34965a6037f4d051e576315e654)
+- add optional [`6ebe36b`](https://github.com/microsoft/devicescript/commit/6ebe36b2d69ccd769e10c95ceb678690c284a016)
+
+#### [v2.15.10](https://github.com/microsoft/devicescript/compare/v2.15.9...v2.15.10)
+
+> 25 September 2023
+
+- avoid search query [`8efb2ba`](https://github.com/microsoft/devicescript/commit/8efb2bac04b2c506bf12e8cfc6bb4efdd01c0d8a)
+
+#### [v2.15.9](https://github.com/microsoft/devicescript/compare/v2.15.8...v2.15.9)
+
+> 25 September 2023
+
+- apply sim route after external resoluation [`4f7f744`](https://github.com/microsoft/devicescript/commit/4f7f744f58e7ba2a2d5325fa63388594bdc303af)
+
+#### [v2.15.8](https://github.com/microsoft/devicescript/compare/v2.15.6...v2.15.8)
+
+> 25 September 2023
+
+- move flash/clean to title commands [`966a659`](https://github.com/microsoft/devicescript/commit/966a6590794d5f3e23fa25b3f1b6a3c46d6b915e)
+- updated sample [`5dde23b`](https://github.com/microsoft/devicescript/commit/5dde23b65e84859c2d7e6267be78e042ac30aee8)
+- macro typo [`6b0f258`](https://github.com/microsoft/devicescript/commit/6b0f2580ba76c42d9f9e0534c1394b88b657571a)
+
+#### [v2.15.6](https://github.com/microsoft/devicescript/compare/v2.15.5...v2.15.6)
+
+> 25 September 2023
+
+- Optimizing Performance and Resource Utilization Through Concurrent Async Execution ✈ [`#623`](https://github.com/microsoft/devicescript/pull/623)
+- updated devices docs [`afa5ce6`](https://github.com/microsoft/devicescript/commit/afa5ce65f6180c6f85e704029ad34eb02eb62f07)
+- add pimoroni pico badger [`3c3ead7`](https://github.com/microsoft/devicescript/commit/3c3ead790276840605d1bb5b37af7651493c1f02)
+- added images [`66a2e96`](https://github.com/microsoft/devicescript/commit/66a2e962b2e7e8b661e23358fc05203b10a83cac)
+
+#### [v2.15.5](https://github.com/microsoft/devicescript/compare/v2.15.4...v2.15.5)
+
+> 15 September 2023
+
+- add more shields [`ce4e9b1`](https://github.com/microsoft/devicescript/commit/ce4e9b15e98969a706163f9f03b7c094b3e3f3b4)
+- adding shield docs [`2ef0b0d`](https://github.com/microsoft/devicescript/commit/2ef0b0d081c26a49fd416de0d35043ac1b344a92)
+- added waveshare shield [`2190c91`](https://github.com/microsoft/devicescript/commit/2190c91d971e2dc75d2885e467219c16266af50b)
+
+#### [v2.15.4](https://github.com/microsoft/devicescript/compare/v2.15.3...v2.15.4)
+
+> 12 September 2023
+
+- update boards (c3fh4-rgb) [`47e9b87`](https://github.com/microsoft/devicescript/commit/47e9b87048fd21760c961827cb4a5722596a3859)
+- updated jacdac specs [`cca3c5c`](https://github.com/microsoft/devicescript/commit/cca3c5cde7b749042b6c68e78b91e330f6d90cae)
+
+#### [v2.15.3](https://github.com/microsoft/devicescript/compare/v2.15.2...v2.15.3)
+
+> 11 September 2023
+
+- remove emsdk cache files [`dab4af5`](https://github.com/microsoft/devicescript/commit/dab4af55392a52bd1a88325d0a76c3dbd3292818)
+- don't release through yarn [`2f19a3a`](https://github.com/microsoft/devicescript/commit/2f19a3a8300aed6e31d3ceb18be811417f22d41b)
+
+#### [v2.15.2](https://github.com/microsoft/devicescript/compare/v2.15.1...v2.15.2)
+
+> 11 September 2023
+
+- Number.isInteger implementation [`#608`](https://github.com/microsoft/devicescript/pull/608)
+- pixelBuffer -&gt; PixelBuffer.alloc [`#609`](https://github.com/microsoft/devicescript/pull/609)
+- generate back link to device page in dsboard jsdocs [`8b97b87`](https://github.com/microsoft/devicescript/commit/8b97b871b9004b74a1840993f34d5e0c45e61282)
+- added devkicc + ssd1306 sample [`64ecea6`](https://github.com/microsoft/devicescript/commit/64ecea623d2824c2278a4b5d2dcd1c77102021c9)
+- rename event worker to avoid confusion with UART [`fc94f8a`](https://github.com/microsoft/devicescript/commit/fc94f8a96b9a18ba221c2d578e8845bf1ed083da)
+
+#### [v2.15.1](https://github.com/microsoft/devicescript/compare/v2.15.0...v2.15.1)
+
+> 14 August 2023
+
+- Array 'With' method implementation [`#605`](https://github.com/microsoft/devicescript/pull/605)
+- fix for https://github.com/microsoft/devicescript/issues/604 [`43d7869`](https://github.com/microsoft/devicescript/commit/43d78699e2bf05e92674979d5115670de9b2c136)
+- fix test suite chunking [`cf17631`](https://github.com/microsoft/devicescript/commit/cf17631685cc38841ef1d1be0ce7a757ead13230)
+- fixed docs link [`fa37857`](https://github.com/microsoft/devicescript/commit/fa3785781d9f75e73fd3f14f0b2be1a583f574fa)
+
+#### [v2.15.0](https://github.com/microsoft/devicescript/compare/v2.14.16...v2.15.0)
+
+> 14 August 2023
+
+- Array sort [`#603`](https://github.com/microsoft/devicescript/pull/603)
+- allow sending events from DS; fixes #373 [`#373`](https://github.com/microsoft/devicescript/issues/373)
+- update add-board docs [`7d4ae14`](https://github.com/microsoft/devicescript/commit/7d4ae148bf494a139682ef2ba5ce12df40a1a6a3)
+
+#### [v2.14.16](https://github.com/microsoft/devicescript/compare/v2.14.15...v2.14.16)
+
+> 11 August 2023
+
+- set prototype in JSON.parse; fixes #578 [`#578`](https://github.com/microsoft/devicescript/issues/578)
+- fix #536: tree-shaking of devsNative protos [`#536`](https://github.com/microsoft/devicescript/issues/536)
+- Add Buffer.rotate; see #596 [`d4d6bd1`](https://github.com/microsoft/devicescript/commit/d4d6bd1a63a6a7c54acb4c25241d73075cb1fd01)
+- document led hw support [`a7262f0`](https://github.com/microsoft/devicescript/commit/a7262f03c4261e6790f4ebafa9b076ab65ec6789)
+- no led show on simulator [`960c0d7`](https://github.com/microsoft/devicescript/commit/960c0d7861b7f732ba450e3828b7d8f372782e6b)
+
+#### [v2.14.15](https://github.com/microsoft/devicescript/compare/v2.14.14...v2.14.15)
+
+> 11 August 2023
+
+- show Leds on hardware [`cf4a0e3`](https://github.com/microsoft/devicescript/commit/cf4a0e374d6dc034f9d30596972b17ac1edc02ed)
+- fix samples and silly crash [`c29a06c`](https://github.com/microsoft/devicescript/commit/c29a06cb12e8b36caffa26d7ee9c561df6de094d)
+- add ledStripSend; v2.14.15 [`785314d`](https://github.com/microsoft/devicescript/commit/785314d1b4ec2e558ad500a97398deb8cf08f863)
+
+#### [v2.14.14](https://github.com/microsoft/devicescript/compare/v2.14.13...v2.14.14)
+
+> 5 August 2023
+
+- Document/implement LED operations [`#595`](https://github.com/microsoft/devicescript/pull/595)
+- better connect dialog for remote scenario [`ba05db1`](https://github.com/microsoft/devicescript/commit/ba05db13c5505afb8663bcd65bfa8a4179e7d918)
+- hide gateway by default [`09ab30b`](https://github.com/microsoft/devicescript/commit/09ab30b899dd037eda6e296b30928d0fefd6b60b)
+- add info link to nvm [`c816704`](https://github.com/microsoft/devicescript/commit/c816704ea0007abf98aa45710d971e7fb2794548)
+
+#### [v2.14.13](https://github.com/microsoft/devicescript/compare/v2.14.12...v2.14.13)
+
+> 28 July 2023
+
+- fix for #591 (attempt) [`e4e2237`](https://github.com/microsoft/devicescript/commit/e4e22370e5f3e524c3cfc10c9a9aa0b2f85098d3)
+- adding more images [`87307b6`](https://github.com/microsoft/devicescript/commit/87307b6171cd1db5453ed7ba8a413803a299c982)
+
+#### [v2.14.12](https://github.com/microsoft/devicescript/compare/v2.14.11...v2.14.12)
+
+> 27 July 2023
+
+- Remote connect [`#589`](https://github.com/microsoft/devicescript/pull/589)
+- typo in contributing file name [`f2656da`](https://github.com/microsoft/devicescript/commit/f2656dac1579586a23ea51baddd115053c1e35ca)
+
+#### [v2.14.11](https://github.com/microsoft/devicescript/compare/v2.14.10...v2.14.11)
+
+> 27 July 2023
+
+- fix for https://github.com/microsoft/devicescript/issues/588 [`ba80cc2`](https://github.com/microsoft/devicescript/commit/ba80cc269609697c3599e2ff9c79fbbe86476909)
+
+#### [v2.14.10](https://github.com/microsoft/devicescript/compare/v2.14.9...v2.14.10)
+
+> 26 July 2023
+
+- better handling of running init on an existing project [`f368b0f`](https://github.com/microsoft/devicescript/commit/f368b0f5cc4ea8bf3c837096e0c466f0256e61cb)
+- detect yarn.lock/package.lock when initiaizing existing project [`a91f438`](https://github.com/microsoft/devicescript/commit/a91f43840f23856cafa8326911bff6324df48ccb)
+- rename "add settings..." to "add device settings..." [`5ae4072`](https://github.com/microsoft/devicescript/commit/5ae40720067612f33e6ec7c9728a30b6e817a703)
+
+#### [v2.14.9](https://github.com/microsoft/devicescript/compare/v2.14.8...v2.14.9)
+
+> 24 July 2023
+
+- support for LED driver + simulation [`#580`](https://github.com/microsoft/devicescript/pull/580)
+- deprecated Math.clamp in favor of constrain [`0e2ee13`](https://github.com/microsoft/devicescript/commit/0e2ee131bbf5c1babe285e5e2e7a11244568c5b0)
+- fix gpiorelay sample [`621c779`](https://github.com/microsoft/devicescript/commit/621c7792e384ae6934002db93f6db890f4c6e5e8)
+- ask for npm/yarn when creating new project [`b0e34d6`](https://github.com/microsoft/devicescript/commit/b0e34d642d7c284672ea11f3229fb1f15f5f8f3e)
+
+#### [v2.14.8](https://github.com/microsoft/devicescript/compare/v2.14.7...v2.14.8)
+
+> 21 July 2023
+
+- use server id in twin message [`#576`](https://github.com/microsoft/devicescript/pull/576)
+- updated jacdac-ts [`a87665f`](https://github.com/microsoft/devicescript/commit/a87665fffc5584611e85889945bebc383e5fd91e)
+
+#### [v2.14.7](https://github.com/microsoft/devicescript/compare/v2.14.6...v2.14.7)
+
+> 21 July 2023
+
+- traffic light server [`#574`](https://github.com/microsoft/devicescript/pull/574)
+- gamepad client apis [`#573`](https://github.com/microsoft/devicescript/pull/573)
+- more error handling on missing @devicescript/cli [`d6cf355`](https://github.com/microsoft/devicescript/commit/d6cf35577076b36b49856efce8d1249aae6feee5)
+- ensure that @devicescript/cli is locally installed [`a3b15cd`](https://github.com/microsoft/devicescript/commit/a3b15cd8177139d39d1c4ac1e94a0037c3d863c3)
+- traffic light sample [`2544de0`](https://github.com/microsoft/devicescript/commit/2544de05e56455a0f7abd3252adb1a994a6d1920)
+
+#### [v2.14.6](https://github.com/microsoft/devicescript/compare/v2.14.5...v2.14.6)
+
+> 21 July 2023
+
+- better error messages on missing node [`941084f`](https://github.com/microsoft/devicescript/commit/941084f4ad58e701bbad6dfdf4a166eff6d66a60)
+- updated pico_w samples [`8368737`](https://github.com/microsoft/devicescript/commit/8368737ff2a70f7cfdf602fdb1ae21672ca43c19)
+- support for large frames over tcp [`3cebccb`](https://github.com/microsoft/devicescript/commit/3cebccbb00386e96a7de3d53a23330e3ec77e3c4)
+
+#### [v2.14.5](https://github.com/microsoft/devicescript/compare/v2.14.4...v2.14.5)
+
+> 20 July 2023
+
+- setup gh action for yarn if detected [`076418b`](https://github.com/microsoft/devicescript/commit/076418b7469bf16f41c5f628e0d32c0010cdd4ba)
+- link pico-lcd pkg [`a9d46ce`](https://github.com/microsoft/devicescript/commit/a9d46ce305739dfc539d2e2d49efc03a462050c1)
+
+#### [v2.14.4](https://github.com/microsoft/devicescript/compare/v2.14.3...v2.14.4)
+
+> 20 July 2023
+
+- add UC8151 docs; fixes #543 [`#543`](https://github.com/microsoft/devicescript/issues/543)
+- document other ST* drivers; fixes #552 [`#552`](https://github.com/microsoft/devicescript/issues/552)
+- add devs init --yarn; fixes for devs add npm [`dd75d94`](https://github.com/microsoft/devicescript/commit/dd75d94e3586ccb41741ca4a586ad87f7ef55a3e)
+- updated shield info [`3fdb86d`](https://github.com/microsoft/devicescript/commit/3fdb86db5a05ea025aa575e23f85c2169e8607cb)
+- more info on shields [`de363e8`](https://github.com/microsoft/devicescript/commit/de363e843552e75e1d1aaf9a5d8976ff8a9d9624)
+
+#### [v2.14.3](https://github.com/microsoft/devicescript/compare/v2.14.2...v2.14.3)
+
+> 20 July 2023
+
+- Server to drivers, Display documentation [`#566`](https://github.com/microsoft/devicescript/pull/566)
+- Indexed screen support [`#564`](https://github.com/microsoft/devicescript/pull/564)
+- sample TSX UI [`#547`](https://github.com/microsoft/devicescript/pull/547)
+- add st7709 [`05e8886`](https://github.com/microsoft/devicescript/commit/05e88868cce6e503e95a5a18e97ef9d7cbad4e4f)
+- updated ssd1306 [`8140a77`](https://github.com/microsoft/devicescript/commit/8140a775233f0202fb659b12cb5874d1d13bda5c)
+- reference help when inserting board configs [`8cd1019`](https://github.com/microsoft/devicescript/commit/8cd1019828556c66ba4f3c41b78f902aea74a822)
+
+#### [v2.14.2](https://github.com/microsoft/devicescript/compare/v2.14.1...v2.14.2)
+
+> 16 July 2023
+
+- add command to upgrade tools [`#562`](https://github.com/microsoft/devicescript/pull/562)
+- project init (create new project) with board [`#561`](https://github.com/microsoft/devicescript/pull/561)
+
+#### [v2.14.1](https://github.com/microsoft/devicescript/compare/v2.14.0...v2.14.1)
+
+> 16 July 2023
+
+- more docs on i2c issues [`#560`](https://github.com/microsoft/devicescript/pull/560)
+- added encodeURIComponent function interface and tests [`#558`](https://github.com/microsoft/devicescript/pull/558)
+- Implement es Set class #496 [`#556`](https://github.com/microsoft/devicescript/pull/556)
+- Implement es Map class #497 [`#538`](https://github.com/microsoft/devicescript/pull/538)
+- led strip encoder [`#557`](https://github.com/microsoft/devicescript/pull/557)
+- Sample weather display #525 [`#555`](https://github.com/microsoft/devicescript/pull/555)
+- Added findLastIndex [`#550`](https://github.com/microsoft/devicescript/pull/550)
+- button led / potentiometer led samples [`#541`](https://github.com/microsoft/devicescript/pull/541)
+- array findLast [`#549`](https://github.com/microsoft/devicescript/pull/549)
+- added array fill [`#548`](https://github.com/microsoft/devicescript/pull/548)
+- value dashboard rendering [`#540`](https://github.com/microsoft/devicescript/pull/540)
+- Organize servers docs into drivers [`#546`](https://github.com/microsoft/devicescript/pull/546)
+- reduce deps of cli (200M-&gt;38M) [`#531`](https://github.com/microsoft/devicescript/pull/531)
+- support for typedoc ready projects [`#545`](https://github.com/microsoft/devicescript/pull/545)
+- Support for JSX/TSX [`#542`](https://github.com/microsoft/devicescript/pull/542)
+- added add-board docs [`8644ddd`](https://github.com/microsoft/devicescript/commit/8644ddd78f1a8a13aec82fa6abf0fdbb8028c870)
+- add docs on adding new SoCs [`169f37b`](https://github.com/microsoft/devicescript/commit/169f37b513d4a4176c0427fb457ec807f8f5c3b4)
+- updated admonitions [`250328d`](https://github.com/microsoft/devicescript/commit/250328dfa914ea01c1346de4703bfacd6af7a4e8)
+
+#### [v2.14.0](https://github.com/microsoft/devicescript/compare/v2.13.10...v2.14.0)
+
+> 5 July 2023
+
+- fix duplicate role tree node warning [`#539`](https://github.com/microsoft/devicescript/pull/539)
+- add schemas for board defs [`2ebe4e7`](https://github.com/microsoft/devicescript/commit/2ebe4e753db44aba43f6734bdf0865b7a2fae332)
+- re-work pin names [`f094f29`](https://github.com/microsoft/devicescript/commit/f094f29b4752c51a957db586f217dcbcb4f1a907)
+- add support for UC8151 e-ink display [`d4bdc0b`](https://github.com/microsoft/devicescript/commit/d4bdc0b97a488f45586ef6e35b4164231bc38a63)
+
+#### [v2.13.10](https://github.com/microsoft/devicescript/compare/v2.13.9...v2.13.10)
+
+> 1 July 2023
+
+- add support for ST7789 screen [`f9292ef`](https://github.com/microsoft/devicescript/commit/f9292eff96bb7a8a93254018288485797f87f594)
+- add support for ?? operator [`b03d062`](https://github.com/microsoft/devicescript/commit/b03d062b4241073bc29d45a9ced026774b7b356d)
+- allow comments in hex literals [`ef179c2`](https://github.com/microsoft/devicescript/commit/ef179c26210bd84550d93000116be142b9b9d001)
+
+#### [v2.13.9](https://github.com/microsoft/devicescript/compare/v2.13.8...v2.13.9)
+
+> 1 July 2023
+
+- Fix typos in website API docs [`#522`](https://github.com/microsoft/devicescript/pull/522)
+- Fixing spelling in getting started [`#521`](https://github.com/microsoft/devicescript/pull/521)
+- added Array.at array package [`#520`](https://github.com/microsoft/devicescript/pull/520)
+- added schedule blinky sample [`b142b1c`](https://github.com/microsoft/devicescript/commit/b142b1c82e57bab81fa97c8edc35a8967d1da582)
+- added doubleblinky sample [`6a14ed9`](https://github.com/microsoft/devicescript/commit/6a14ed9f3507d576973dc06e90d537bb5edeb577)
+- less aggressive about showing the simulator pane [`fcffd49`](https://github.com/microsoft/devicescript/commit/fcffd49fee2c31f192e0569d2838bf5d72b43998)
+
+#### [v2.13.8](https://github.com/microsoft/devicescript/compare/v2.13.7...v2.13.8)
+
+> 30 June 2023
+
+- MQTT updates [`#516`](https://github.com/microsoft/devicescript/pull/516)
+- mqtt: better handling of disconnection [`851582a`](https://github.com/microsoft/devicescript/commit/851582a57b599ce5de23fb8cff51318de0cd925b)
+- added mqtt sample [`c09018d`](https://github.com/microsoft/devicescript/commit/c09018d1ac28df16b7069cc3f6c61b4c932ccf14)
+- more configuration options [`6685ff0`](https://github.com/microsoft/devicescript/commit/6685ff0bbedaf7b9ffef5a93777096e0a5b07483)
+
+#### [v2.13.7](https://github.com/microsoft/devicescript/compare/v2.13.6...v2.13.7)
+
+> 29 June 2023
+
+- MQTT [`#513`](https://github.com/microsoft/devicescript/pull/513)
+- Palette, display in graphics [`#511`](https://github.com/microsoft/devicescript/pull/511)
+- removing eventtarget [`66fdd86`](https://github.com/microsoft/devicescript/commit/66fdd86202c86931a80dacb4bcd2e7f597498a50)
+- add DOM-like EventTarget [`dcb40e1`](https://github.com/microsoft/devicescript/commit/dcb40e13fa081269c41d8e44c47d4a0cc44e9c6e)
+- add common events on socket type [`56b4f2a`](https://github.com/microsoft/devicescript/commit/56b4f2a0382c32371a5511281d849e6385281372)
+
+#### [v2.13.6](https://github.com/microsoft/devicescript/compare/v2.13.5...v2.13.6)
+
+> 26 June 2023
+
+- Node v16 minimal support (v18 not required) [`#510`](https://github.com/microsoft/devicescript/pull/510)
+- support for switchMap in observables [`#508`](https://github.com/microsoft/devicescript/pull/508)
+- add thingspeak [`4cf9b54`](https://github.com/microsoft/devicescript/commit/4cf9b54efa6878aade25ce9c30d547783b0e00c5)
+- missing awaits [`64668d0`](https://github.com/microsoft/devicescript/commit/64668d0e1286ddf74d16b8d6d684bc5baada5a8f)
+- add node.js diag [`8bdd1c6`](https://github.com/microsoft/devicescript/commit/8bdd1c6fb23339f8855b93fd62805c58897e1b65)
+
+#### [v2.13.5](https://github.com/microsoft/devicescript/compare/v2.13.3...v2.13.5)
+
+> 25 June 2023
+
+- add for-in statement; fixes #500 [`#500`](https://github.com/microsoft/devicescript/issues/500)
+- added blynk example [`449a09e`](https://github.com/microsoft/devicescript/commit/449a09e037c2e5e451b52ac52749e6aec391775e)
+- updated contributing [`fcbde77`](https://github.com/microsoft/devicescript/commit/fcbde777d11cdf3cef86d1d2e9faba78b6909ce7)
+- more docs on packages [`9a5e463`](https://github.com/microsoft/devicescript/commit/9a5e463057cff88d81c381f7c01e319675cc0093)
+
+#### [v2.13.3](https://github.com/microsoft/devicescript/compare/v2.13.2...v2.13.3)
+
+> 23 June 2023
+
+- jd-c with startMotor(); fixes #461 [`#461`](https://github.com/microsoft/devicescript/issues/461)
+- add additional array ctor, see #501 [`9b1c212`](https://github.com/microsoft/devicescript/commit/9b1c21261489b1f6645a4064ecc588e6478d6dcc)
+- add Object and Array ctors; see #501 [`731c85d`](https://github.com/microsoft/devicescript/commit/731c85dab82844a6450fa4934f8a329913599b09)
+
+#### [v2.13.2](https://github.com/microsoft/devicescript/compare/v2.13.1...v2.13.2)
+
+> 23 June 2023
+
+- more contrivuting to docs [`f191669`](https://github.com/microsoft/devicescript/commit/f191669fb457d7ebef6b0dce5230470f3bf3f2b3)
+- reorg contributions page [`63ade1d`](https://github.com/microsoft/devicescript/commit/63ade1db678fda30cd356e17695d722f6dc57f18)
+- don't use GPIO0 as TX by default on pico [`e74b6c1`](https://github.com/microsoft/devicescript/commit/e74b6c1c7863fe01625b2eee1b2780aa77c4705b)
+
+#### [v2.13.1](https://github.com/microsoft/devicescript/compare/v2.13.0...v2.13.1)
+
+> 23 June 2023
+
+- allow arbitrary config in configureHardware(); fixes #473 [`#473`](https://github.com/microsoft/devicescript/issues/473)
+- add memory docs; fixes #397 [`#397`](https://github.com/microsoft/devicescript/issues/397)
+- remove _ from role names; fixes #389 [`#389`](https://github.com/microsoft/devicescript/issues/389)
+- add docs on services vs $services; fixes #459 [`#459`](https://github.com/microsoft/devicescript/issues/459)
+- add docs for `devs bundle`; fixes #495 [`#495`](https://github.com/microsoft/devicescript/issues/495)
+- add devkitM S3 [`b6782cb`](https://github.com/microsoft/devicescript/commit/b6782cb61ea2fde285c5ed7c732bf04176a5f3ac)
+- use HKDF in encryptedFetch() [`4ca8550`](https://github.com/microsoft/devicescript/commit/4ca8550a2148f0dc84f46ada32bf727236e1a181)
+- picture for devkitM [`5ba81f0`](https://github.com/microsoft/devicescript/commit/5ba81f0ac3142b52046228abc0c2e8c7cef5dfa9)
+
+#### [v2.13.0](https://github.com/microsoft/devicescript/compare/v2.12.3...v2.13.0)
+
+> 22 June 2023
+
+- add 'devs bundle' command [`de9532d`](https://github.com/microsoft/devicescript/commit/de9532d0cf68a5d4a76b58f118e65159ff3d8be0)
+- update board definitions [`ba705d3`](https://github.com/microsoft/devicescript/commit/ba705d3f0455d0357a2cd5c6a77b93a187cd3870)
+- add encryptedFetch() [`714f0ed`](https://github.com/microsoft/devicescript/commit/714f0eda364a5acdc0b994c28ac10c3cc9332526)
+
+#### [v2.12.3](https://github.com/microsoft/devicescript/compare/v2.12.2...v2.12.3)
+
+> 20 June 2023
+
+- allow hex encoding in Buffer.from(); 2.12.3 [`5c2a4d8`](https://github.com/microsoft/devicescript/commit/5c2a4d8d52e98057bec4f5d6782937bf96be285a)
+
+#### [v2.12.2](https://github.com/microsoft/devicescript/compare/v2.12.1...v2.12.2)
+
+> 20 June 2023
+
+- Node version detect [`#493`](https://github.com/microsoft/devicescript/pull/493)
+- add readme linking to proper docs; fixes #476 [`#476`](https://github.com/microsoft/devicescript/issues/476)
+- add @devicescript/crypto [`4e07577`](https://github.com/microsoft/devicescript/commit/4e07577c5d97c2a24e25e8df4e5d5cc201b224a5)
+- allow for arbitrary tag size in AES CCM [`ee8a688`](https://github.com/microsoft/devicescript/commit/ee8a6880ae113407e465f2625a35beaac704d64c)
+
+#### [v2.12.1](https://github.com/microsoft/devicescript/compare/v2.12.0...v2.12.1)
+
+> 20 June 2023
+
+- add Image.buffer property [`7c520f6`](https://github.com/microsoft/devicescript/commit/7c520f61a8fda3bf797a2b747bfe5461959f12f3)
+
+#### [v2.12.0](https://github.com/microsoft/devicescript/compare/v2.11.6...v2.12.0)
+
+> 20 June 2023
+
+- native GPIO, SPI image send, and ST7735 screens support [`#490`](https://github.com/microsoft/devicescript/pull/490)
+- fix port parsing [`#491`](https://github.com/microsoft/devicescript/pull/491)
+- Misc word/grammar fixes to index.mdx [`#483`](https://github.com/microsoft/devicescript/pull/483)
+- Dotmatrix over image implementation [`#480`](https://github.com/microsoft/devicescript/pull/480)
+- ImageRenderingContext [`#478`](https://github.com/microsoft/devicescript/pull/478)
+- math.map helper class [`#477`](https://github.com/microsoft/devicescript/pull/477)
+- doc reorg [`ce12d80`](https://github.com/microsoft/devicescript/commit/ce12d80a4d8119e117c884ec00897ca239c9d586)
+- docs update [`5ad5a93`](https://github.com/microsoft/devicescript/commit/5ad5a930f205033c626875b6263c980ef5c753b0)
+- introduce common Display interface [`e6a6115`](https://github.com/microsoft/devicescript/commit/e6a6115e3051b6aff01263c3ec137fb2c97b0301)
+
+#### [v2.11.6](https://github.com/microsoft/devicescript/compare/v2.11.5...v2.11.6)
+
+> 10 June 2023
+
+- String.split support [`#463`](https://github.com/microsoft/devicescript/pull/463)
+- character screen server [`#462`](https://github.com/microsoft/devicescript/pull/462)
+- blynk HTTP support [`#475`](https://github.com/microsoft/devicescript/pull/475)
+- added socket example, use same api as node [`#470`](https://github.com/microsoft/devicescript/pull/470)
+- more runtime docs [`55e8f99`](https://github.com/microsoft/devicescript/commit/55e8f993441fd36e818fcd790e4814a3488d8243)
+- use singleton for spi to match i2c [`fcae930`](https://github.com/microsoft/devicescript/commit/fcae930d59308ff84b971183a2aa0e681a03a9f6)
+- add devcontainer to project template [`6bb6e9c`](https://github.com/microsoft/devicescript/commit/6bb6e9ca0bc81fd68b1faad1e036734ce76bef2c)
+
+#### [v2.11.5](https://github.com/microsoft/devicescript/compare/v2.11.4...v2.11.5)
+
+> 9 June 2023
+
+- refactoring iot docs [`#469`](https://github.com/microsoft/devicescript/pull/469)
+- remove professional from docs [`#467`](https://github.com/microsoft/devicescript/pull/467)
+- fix #466 I2C bug; 2.11.5 [`#466`](https://github.com/microsoft/devicescript/issues/466)
+- Fix SPI mention [`919ce81`](https://github.com/microsoft/devicescript/commit/919ce817889b5579da8589e28cd9e9e52fdf6672)
+
+#### [v2.11.4](https://github.com/microsoft/devicescript/compare/v2.11.3...v2.11.4)
+
+> 9 June 2023
+
+- fix typo; thank you Benjamin_Dobell [`a59e8aa`](https://github.com/microsoft/devicescript/commit/a59e8aafce2b66c602c60bc82bb1bfd23298e5db)
+- handle syntactic difference of npm [`cb4533e`](https://github.com/microsoft/devicescript/commit/cb4533ecc1b65f365efa627da77de2291b17b71b)
+
+#### [v2.11.3](https://github.com/microsoft/devicescript/compare/v2.11.2...v2.11.3)
+
+> 9 June 2023
+
+- added shtc3 example [`314dcb6`](https://github.com/microsoft/devicescript/commit/314dcb691a2ff1fb8e74ef842287b9468506f515)
+- fix deadlock when upgrading cli tools [`32fe8ad`](https://github.com/microsoft/devicescript/commit/32fe8adb462e31a39c422cdea5701e11528a0e59)
+- add bytecode to docs [`0881e6d`](https://github.com/microsoft/devicescript/commit/0881e6d1687eaa472cbe0d5754e00b52bf129216)
+
+#### [v2.11.2](https://github.com/microsoft/devicescript/compare/v2.11.1...v2.11.2)
+
+> 9 June 2023
+
+- fix issue with npm upgrade detection [`9312277`](https://github.com/microsoft/devicescript/commit/9312277490d75408c4da5de97f7bf394756618c2)
+- docs about adding boards [`30234ae`](https://github.com/microsoft/devicescript/commit/30234ae255174443a62e27c26f331fbd4c26fad1)
+- Update README.md [`439463a`](https://github.com/microsoft/devicescript/commit/439463a54b7c01f52d1c5be20bf58bf3ba35b235)
+
+#### [v2.11.1](https://github.com/microsoft/devicescript/compare/v2.11.0...v2.11.1)
+
+> 8 June 2023
+
+- added blues docs [`55a0526`](https://github.com/microsoft/devicescript/commit/55a0526d3ac8c36baaff41b25bc843ac7c4aa0a0)
+- skip blues sample [`a0650ad`](https://github.com/microsoft/devicescript/commit/a0650adcd792750bcbe7116265b23f952f13c6c5)
+
+#### [v2.11.0](https://github.com/microsoft/devicescript/compare/v2.10.10...v2.11.0)
+
+> 8 June 2023
+
+- add built-in Image type [`#423`](https://github.com/microsoft/devicescript/pull/423)
+- Wifi settings [`#457`](https://github.com/microsoft/devicescript/pull/457)
+- mcuTemperature API + docs [`#454`](https://github.com/microsoft/devicescript/pull/454)
+- add adafruit.io example [`bea432d`](https://github.com/microsoft/devicescript/commit/bea432d7c228bb4e67a34fa7a959113989e3bcc4)
+- updated build status sample [`c11926c`](https://github.com/microsoft/devicescript/commit/c11926c438dc2ca2a0a887b99d6507e2180c6ae6)
+- more samples [`4ed8968`](https://github.com/microsoft/devicescript/commit/4ed8968f9b693ba025f9fdaa05a5c107ea72f049)
+
+#### [v2.10.10](https://github.com/microsoft/devicescript/compare/v2.10.9...v2.10.10)
+
+> 8 June 2023
+
+- Minor Style fixes no section 5. [`#453`](https://github.com/microsoft/devicescript/pull/453)
+- updated docs on custom packages [`83f1bad`](https://github.com/microsoft/devicescript/commit/83f1bad5f62a9a43280d18035a5141d8d0580e6b)
+- stabler serial connection [`0d33b15`](https://github.com/microsoft/devicescript/commit/0d33b15d80a6e7d0167691707856147f144d05cc)
+- add github action file for npm package [`bec68be`](https://github.com/microsoft/devicescript/commit/bec68bea45b9f7fdfdd5a9089c59dd453fda212e)
+
+#### [v2.10.9](https://github.com/microsoft/devicescript/compare/v2.10.8...v2.10.9)
+
+> 7 June 2023
+
+- disable auto-start when connected with vscode [`#451`](https://github.com/microsoft/devicescript/pull/451)
+- updated error generation [`611ab5c`](https://github.com/microsoft/devicescript/commit/611ab5c6b192c3e9be1c314ddfa68964d2ae5090)
+- keep GC heap around [`a7f9948`](https://github.com/microsoft/devicescript/commit/a7f9948463388c99345ac0d13f44481c968859ba)
+- add special ds._panic(0xab04711) for low-level panic [`a53ea32`](https://github.com/microsoft/devicescript/commit/a53ea323cd5527874a4acfdf1436fd0382a68589)
+
+#### [v2.10.8](https://github.com/microsoft/devicescript/compare/v2.10.7...v2.10.8)
+
+> 7 June 2023
+
+- adding error infrastructure [`2190501`](https://github.com/microsoft/devicescript/commit/21905013dd1fdb74b84ce40d99f07b002a670941)
+- trap long settings at compile time [`4e3b710`](https://github.com/microsoft/devicescript/commit/4e3b71094c1ba89556b1f8867dce90e0a32570ba)
+- more logging [`b4c77aa`](https://github.com/microsoft/devicescript/commit/b4c77aa90bb319a82b357805ebedb38c5ad457f5)
+
+#### [v2.10.7](https://github.com/microsoft/devicescript/compare/v2.10.6...v2.10.7)
+
+> 7 June 2023
+
+- stop simulator when physical device connects [`5911164`](https://github.com/microsoft/devicescript/commit/5911164ba4ebceba3c320f3ce517cc2d52ab41cf)
+
+#### [v2.10.6](https://github.com/microsoft/devicescript/compare/v2.10.5...v2.10.6)
+
+> 7 June 2023
+
+- don't use yarn [`#443`](https://github.com/microsoft/devicescript/pull/443)
+- adding worksho info [`d7f0539`](https://github.com/microsoft/devicescript/commit/d7f0539be064afcf3f908c962bb361cbe70b1e3f)
+- updated  workshop info [`be75cdb`](https://github.com/microsoft/devicescript/commit/be75cdb8df454dc811724d186a61a58fb52452e6)
+- update buzzer docs [`0113838`](https://github.com/microsoft/devicescript/commit/0113838efc041ea694c76b34a97d70f8491b6e92)
+
+#### [v2.10.5](https://github.com/microsoft/devicescript/compare/v2.10.4...v2.10.5)
+
+> 6 June 2023
+
+- throttle outgoing packets (50/s) [`6a3a631`](https://github.com/microsoft/devicescript/commit/6a3a631b61f6fd9bf7cb09a216fb556440467e06)
+- tweak GC trigger heuristic [`f9ba2cf`](https://github.com/microsoft/devicescript/commit/f9ba2cf7198337e954d40d93a66a83cac9031bda)
+- simplify gc trigger logic [`00b0b21`](https://github.com/microsoft/devicescript/commit/00b0b21b2dea0cf1d969d85d40970a11d70c61fe)
+
+#### [v2.10.4](https://github.com/microsoft/devicescript/compare/v2.10.3...v2.10.4)
+
+> 6 June 2023
+
+- add clean option in UI [`ad1f4a1`](https://github.com/microsoft/devicescript/commit/ad1f4a19c50cac0d6826b787a3d0f78d39089c7f)
+- better error reporting [`48c00b6`](https://github.com/microsoft/devicescript/commit/48c00b687a3b72abfa2860f8d5b25d57d08d069c)
+- revert clean option [`ffcf189`](https://github.com/microsoft/devicescript/commit/ffcf1895a025f9b033c9689ac87a80cec68910da)
+
+#### [v2.10.3](https://github.com/microsoft/devicescript/compare/v2.10.2...v2.10.3)
+
+> 6 June 2023
+
+- use python extension to resolve python path [`0e85940`](https://github.com/microsoft/devicescript/commit/0e859405b080cae3b62147f775e8a1a4833b3b3f)
+- adding schedule function [`98ed647`](https://github.com/microsoft/devicescript/commit/98ed6473c4bee6e996288d285a530562ca593bd5)
+- collect version number when reporting issue [`354b272`](https://github.com/microsoft/devicescript/commit/354b272d7e49580a0d36de6b44b117393ea3b6d4)
+
+#### [v2.10.2](https://github.com/microsoft/devicescript/compare/v2.10.1...v2.10.2)
+
+> 6 June 2023
+
+- add 'devs flash --clean ...' [`c94fb79`](https://github.com/microsoft/devicescript/commit/c94fb7963d376377e6b0f233fffd35c52236fb1f)
+- updated github build sample [`b4b9f00`](https://github.com/microsoft/devicescript/commit/b4b9f001d8f3fd78f9caaa74a6ccfc7029146e11)
+- unicode trim(); info on ASCII toLowerCase() [`f337581`](https://github.com/microsoft/devicescript/commit/f337581b40994adceb2ce9c496ca26c1dd6e7d38)
+
+#### [v2.10.1](https://github.com/microsoft/devicescript/compare/v2.10.0...v2.10.1)
+
+> 5 June 2023
+
+- auto install esptool on flash [`#437`](https://github.com/microsoft/devicescript/pull/437)
+- sample using fetch [`#435`](https://github.com/microsoft/devicescript/pull/435)
+- add option to add settings, tests in wand [`#436`](https://github.com/microsoft/devicescript/pull/436)
+- tcp/tls sockets for wasm [`73b688e`](https://github.com/microsoft/devicescript/commit/73b688ef36e8dfa80912a5074723bf6452799ec2)
+- add observable timestamp operator [`0f4bf61`](https://github.com/microsoft/devicescript/commit/0f4bf6195f2fed6593ee28bec107f6a74ecaf59a)
+- more aggressive GC; 2.10.1 [`fbefb8d`](https://github.com/microsoft/devicescript/commit/fbefb8d851e77b3b5502e2546beaf6312cbf2d07)
+
+#### [v2.10.0](https://github.com/microsoft/devicescript/compare/v2.9.16...v2.10.0)
+
+> 5 June 2023
+
+- 2.10.0: add net.Socket, net.fetch and more String/Buffer methods [`#433`](https://github.com/microsoft/devicescript/pull/433)
+- Fix trivial typo in CLI docs [`#431`](https://github.com/microsoft/devicescript/pull/431)
+- ROS [`#430`](https://github.com/microsoft/devicescript/pull/430)
+- fix docs codegen for builtin packages [`22c688d`](https://github.com/microsoft/devicescript/commit/22c688d7545f7842f4ecfe27891c178d835b7315)
+- fix new gcc warning: int foo() -&gt; int foo(void) [`615e1eb`](https://github.com/microsoft/devicescript/commit/615e1ebdee4566e57ca30dbcd54b9c8f3474e7e6)
+- remove it support in tests [`a8bb583`](https://github.com/microsoft/devicescript/commit/a8bb583fcfa22ef1b41d87d5d297b65d897947af)
+
+#### [v2.9.16](https://github.com/microsoft/devicescript/compare/v2.9.15...v2.9.16)
+
+> 1 June 2023
+
+- more docs on settings [`46f1633`](https://github.com/microsoft/devicescript/commit/46f16338aa34da4fa36e416328dd5e167a4272dc)
+- more docs [`172645d`](https://github.com/microsoft/devicescript/commit/172645dd94286c8b2df860b698b89357c09669eb)
+- add issue reporting [`5f57c62`](https://github.com/microsoft/devicescript/commit/5f57c621a2ef518ef1d9d4b586472a3775d006fc)
+
+#### [v2.9.15](https://github.com/microsoft/devicescript/compare/v2.9.14...v2.9.15)
+
+> 1 June 2023
+
+- barebone docs on spi [`0f568ac`](https://github.com/microsoft/devicescript/commit/0f568ac607e9364017e34eadab8fae321ac278fc)
+- add note about network support [`d5aac75`](https://github.com/microsoft/devicescript/commit/d5aac7525b7c3234665e503a697581f339a634f2)
+- add settings clear menu item [`2188d0b`](https://github.com/microsoft/devicescript/commit/2188d0bc064faef5215b3434c8a741991f0809ad)
+
+#### [v2.9.14](https://github.com/microsoft/devicescript/compare/v2.9.13...v2.9.14)
+
+> 1 June 2023
+
+- support for .env file [`#426`](https://github.com/microsoft/devicescript/pull/426)
+- tsdoc attributes normalization [`#424`](https://github.com/microsoft/devicescript/pull/424)
+- docs: fix broken HomeBridge hyperlink [`#422`](https://github.com/microsoft/devicescript/pull/422)
+- Update index.mdx [`#417`](https://github.com/microsoft/devicescript/pull/417)
+- Typo fix in CONTRIBUTING.md [`#416`](https://github.com/microsoft/devicescript/pull/416)
+- Fix documentation typos [`#415`](https://github.com/microsoft/devicescript/pull/415)
+- allow @ds-when-used attributes; fixes #332 [`#332`](https://github.com/microsoft/devicescript/issues/332)
+- updated docs about status light [`ecb7c7b`](https://github.com/microsoft/devicescript/commit/ecb7c7be5ab9c882e6194880e63d4ba60932fd06)
+- Update issue templates [`05fc469`](https://github.com/microsoft/devicescript/commit/05fc469c3f8d25781a18f1b8e37ca24e9f95f43e)
+- Update issue templates [`509ce4f`](https://github.com/microsoft/devicescript/commit/509ce4fc77a5fa88ca5773e47ba66911b84f8c1f)
+
+#### [v2.9.13](https://github.com/microsoft/devicescript/compare/v2.9.12...v2.9.13)
+
+> 25 May 2023
+
+- support for yarn 2.0 [`#406`](https://github.com/microsoft/devicescript/pull/406)
+- Fix typo in events.md [`#399`](https://github.com/microsoft/devicescript/pull/399)
+- Fix typo in add-board.mdx [`#400`](https://github.com/microsoft/devicescript/pull/400)
+- Update json.mdx [`#398`](https://github.com/microsoft/devicescript/pull/398)
+- add csv history [`48500b3`](https://github.com/microsoft/devicescript/commit/48500b38d465a24996430f6e8a78c9151b4d9002)
+- simplify sample [`7ba4133`](https://github.com/microsoft/devicescript/commit/7ba4133371eef1be7985d72f304cebedacaae890)
+- add @devicescript/spi module [`05feaaf`](https://github.com/microsoft/devicescript/commit/05feaaf3ff42a5161b788fc461b421aa1f491b4c)
+
+#### [v2.9.12](https://github.com/microsoft/devicescript/compare/v2.9.11...v2.9.12)
+
+> 18 May 2023
+
+- more led runtime [`d49250b`](https://github.com/microsoft/devicescript/commit/d49250b1bba6c3804f01988a091fdde6ceec7037)
+- allow address setting on BME680; defl to 0x76 (Seeed) [`6f5594a`](https://github.com/microsoft/devicescript/commit/6f5594a8d9ee91d3394be06c175552538777fc62)
+- updated gateway docs [`2168e56`](https://github.com/microsoft/devicescript/commit/2168e56d166905dc0c6b7733e893611d2f50ef7f)
+
+#### [v2.9.11](https://github.com/microsoft/devicescript/compare/v2.9.10...v2.9.11)
+
+> 17 May 2023
+
+- cleanup client commands [`99bd7d8`](https://github.com/microsoft/devicescript/commit/99bd7d89964a4ebd7c8ce6a2ce7d947f78a5f77c)
+- support F shortcut in all videos [`f923ab9`](https://github.com/microsoft/devicescript/commit/f923ab95d0b1cfaacbab17131b3ed0666874dfe2)
+- support F key for full screen [`b23be3e`](https://github.com/microsoft/devicescript/commit/b23be3ed6f9dae0ebcab661a2f69ada725278415)
+
+#### [v2.9.10](https://github.com/microsoft/devicescript/compare/v2.9.9...v2.9.10)
+
+> 15 May 2023
+
+- fix crash in role mgr; bump jd-c [`3bb6e63`](https://github.com/microsoft/devicescript/commit/3bb6e6300487668f24b72dce4166790babd1f5ee)
+- docs: statics supported [`3ef6df2`](https://github.com/microsoft/devicescript/commit/3ef6df29ee3b4d21fa253bec2a373667c210c8dc)
+
 #### [v2.9.9](https://github.com/microsoft/devicescript/compare/v2.9.8...v2.9.9)
 
 > 15 May 2023
@@ -99,8 +831,8 @@ All notable changes to this project will be documented in this file. Dates are d
 > 28 April 2023
 
 - fixes around frame sending [`81547c8`](https://github.com/microsoft/devicescript/commit/81547c8e5ed6bc861b15c9f4961b8de4c5241774)
-- bump jd-c; 2.8.2 [`22a66ff`](https://github.com/microsoft/devicescript/commit/22a66fff6381a5ed8bf5deca5de723480b9ccfc5)
 - use new jd_need_to_send() [`92620b0`](https://github.com/microsoft/devicescript/commit/92620b06e3f23b4b637b91c06d4dce6fb67491fa)
+- bump jd-c; 2.8.2 [`22a66ff`](https://github.com/microsoft/devicescript/commit/22a66fff6381a5ed8bf5deca5de723480b9ccfc5)
 
 #### [v2.8.1](https://github.com/microsoft/devicescript/compare/v2.8.0...v2.8.1)
 
@@ -227,7 +959,7 @@ All notable changes to this project will be documented in this file. Dates are d
 
 - initial work on UTF8 strings [`747d802`](https://github.com/microsoft/devicescript/commit/747d802196ff62d07bfae199fcfdb1865efaf4f6)
 - Add String.join() [`487f1ee`](https://github.com/microsoft/devicescript/commit/487f1ee2f351d1de4620f963d360303a9e2f04e3)
-- Add String.fromCharCode() [`6d427f0`](https://github.com/microsoft/devicescript/commit/6d427f07c80e99d518832c3f0d6e77fe8c3011be)
+- add unicode test from pxt [`402c3d6`](https://github.com/microsoft/devicescript/commit/402c3d6bb89b9d5e2278051cc76cd52a8a68a686)
 
 #### [v2.4.4](https://github.com/microsoft/devicescript/compare/v2.4.3...v2.4.4)
 
@@ -412,9 +1144,9 @@ All notable changes to this project will be documented in this file. Dates are d
 > 28 March 2023
 
 - fix: add json5 [`#186`](https://github.com/microsoft/devicescript/pull/186)
-- ds.reboot()-&gt;ds.restart(); ds.reboot() now reboots [`e43fd0a`](https://github.com/microsoft/devicescript/commit/e43fd0a2a0c08798879cb3f1a04eea71f0c8561b)
 - corrrectly display data [`832aae0`](https://github.com/microsoft/devicescript/commit/832aae028933953bf43921f043e0144ea533224e)
 - save file to 'data', normalize time to seconds [`0482692`](https://github.com/microsoft/devicescript/commit/0482692d707278c351bed7eead5e59511aae6fe0)
+- ds.reboot()-&gt;ds.restart(); ds.reboot() now reboots [`e43fd0a`](https://github.com/microsoft/devicescript/commit/e43fd0a2a0c08798879cb3f1a04eea71f0c8561b)
 
 #### [v2.2.12](https://github.com/microsoft/devicescript/compare/v2.2.11...v2.2.12)
 
@@ -512,8 +1244,8 @@ All notable changes to this project will be documented in this file. Dates are d
 > 23 March 2023
 
 - Settings [`#251`](https://github.com/microsoft/devicescript/pull/251)
-- use fiber suspend in setTimeout(); v2.2.0 [`ba3b780`](https://github.com/microsoft/devicescript/commit/ba3b780c61f778ee2c69f8b76970e6efcb1deb80)
 - don't run git commands if no .git folder [`830bceb`](https://github.com/microsoft/devicescript/commit/830bcebeaa7a3e371a247f661206cd4e1e478fe8)
+- use fiber suspend in setTimeout(); v2.2.0 [`ba3b780`](https://github.com/microsoft/devicescript/commit/ba3b780c61f778ee2c69f8b76970e6efcb1deb80)
 - implement debug pause button [`4fbe25d`](https://github.com/microsoft/devicescript/commit/4fbe25d6403d63bac535f0957bdce8623c7b0c18)
 
 #### [v2.1.0](https://github.com/microsoft/devicescript/compare/v2.0.9...v2.1.0)

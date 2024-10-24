@@ -38,20 +38,15 @@ void devs_set_global_flags(uint32_t global_flags);
 void devs_reset_global_flags(uint32_t global_flags);
 uint32_t devs_get_global_flags(void);
 
+void devs_gpio_init_dcfg(devs_ctx_t *ctx);
+
 // General utils
 char *devs_json_escape(const char *str, unsigned sz);
 
 // DeviceScript manager service
-typedef struct {
-#if !JD_SETTINGS_LARGE
-    void *program_base;
-    uint32_t max_program_size;
-#endif
-} devsmgr_cfg_t;
-
-void devsmgr_init(const devsmgr_cfg_t *cfg);
+void devsmgr_init(void);
 // start all related services, including network and debugging
-void devs_service_full_init(const devsmgr_cfg_t *cfg);
+void devs_service_full_init(void);
 
 devs_ctx_t *devsmgr_get_ctx(void);
 int devsmgr_deploy(const void *img, unsigned imgsize);
@@ -59,8 +54,6 @@ int devsmgr_get_hash(uint8_t hash[JD_SHA256_HASH_BYTES]);
 int devsmgr_deploy_start(uint32_t sz);
 int devsmgr_deploy_write(const void *buf, unsigned size);
 void devsmgr_restart(void);
-
-const devsmgr_cfg_t *devsmgr_init_mem(unsigned size);
 
 void devsdbg_init(void);
 void devsdbg_suspend_cb(devs_ctx_t *ctx);

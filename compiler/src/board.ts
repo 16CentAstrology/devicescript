@@ -6,9 +6,11 @@ import {
     PinFunction,
     normalizeDeviceConfig,
     parseAnyInt,
+    architectureFamily,
 } from "@devicescript/interop"
 import { DeviceCatalog, deviceCatalogImage, unique } from "jacdac-ts"
 import { resolveBuildConfig } from "./specgen"
+import { assert, ellipseFirstSentence } from "./jdutil"
 
 export function boardInfos(info: RepoInfo) {
     return Object.values(info.boards).map(b =>
@@ -26,6 +28,7 @@ export interface BoardInfo {
     pinInfo: PinInfo[]
     pinInfoText: string
     markdown: string
+    errors: string[]
 }
 
 export function boardInfo(cfg: DeviceConfig, arch?: ArchConfig): BoardInfo {
@@ -34,31 +37,44 @@ export function boardInfo(cfg: DeviceConfig, arch?: ArchConfig): BoardInfo {
     const conn = (c: { $connector?: string }) =>
         c?.$connector ? ` using ${c.$connector} connector` : ``
 
+    const resolvePin = (p: string | number) => {
+        // if (typeof p == "string") return (cfg.pins as any)[p] ?? p
+        // else return p
+        return p
+    }
+
     if (cfg.jacdac?.pin !== undefined)
-        features.push(`Jacdac on pin ${cfg.jacdac.pin}${conn(cfg.jacdac)}`)
+        features.push(
+            `Jacdac on pin ${resolvePin(cfg.jacdac.pin)}${conn(cfg.jacdac)}`
+        )
 
     if (cfg.i2c?.pinSDA !== undefined) {
         features.push(
-            `I2C on SDA/SCL: ${cfg.i2c.pinSDA}/${cfg.i2c.pinSCL}${conn(
-                cfg.i2c
-            )}`
+            `I2C on ${resolvePin(cfg.i2c.pinSDA)}/${resolvePin(
+                cfg.i2c.pinSCL
+            )}${conn(cfg.i2c)}`
         )
     }
 
     if (cfg.led) {
+        const ledpin = resolvePin(cfg.led.pin)
+        const help = ` (use [setStatusLight](/developer/status-light) to control)`
         if (cfg.led.type === 1)
-            features.push(`WS2812B RGB LED on ${cfg.led.pin}`)
+            features.push(`WS2812B RGB LED on pin ${ledpin} ${help}`)
+        else if (cfg.led.type > 99) features.push(`custom LED ${help}`)
         else if (cfg.led.rgb?.length == 3)
             features.push(
-                `RGB LED on pins ${cfg.led.rgb.map(l => l.pin).join(", ")}`
+                `RGB LED on pins ${cfg.led.rgb
+                    .map(l => l.pin)
+                    .join(", ")} ${help}`
             )
-        else if (cfg.led.pin !== undefined)
-            features.push(`LED on pin ${cfg.led.pin}`)
+        else if (ledpin !== undefined)
+            features.push(`LED on pin ${ledpin} ${help}`)
     }
 
     if (cfg.log?.pinTX !== undefined)
         features.push(
-            `Serial logging on pin ${cfg.log.pinTX} at ${
+            `Serial logging on pin ${resolvePin(cfg.log.pinTX)} at ${
                 cfg.log.baud || 115200
             } 8N1`
         )
@@ -86,6 +102,7 @@ export function boardInfo(cfg: DeviceConfig, arch?: ArchConfig): BoardInfo {
         services,
         pinInfo: pi.infos,
         pinInfoText: pi.desc,
+        errors: pi.errors,
         markdown: "",
     }
 
@@ -104,15 +121,6 @@ export function boardInfo(cfg: DeviceConfig, arch?: ArchConfig): BoardInfo {
     return b
 }
 
-export function architectureFamily(id: string) {
-    const arches: Record<string, string> = {
-        esp32s2: "esp32",
-        esp32c3: "esp32",
-        rp2040w: "rp2040",
-    }
-    return arches[id] || id
-}
-
 function deviceConfigToMarkdown(
     board: DeviceConfig,
     arch: ArchConfig,
@@ -122,6 +130,12 @@ function deviceConfigToMarkdown(
     const { id } = spec || {}
     const boardJson = normalizeDeviceConfig(board, { ignoreFirmwareUrl: true })
     const info = boardInfo(board, arch)
+    const fdevId = boardIdToFilename(devId)
+
+    if (info.errors?.length) {
+        console.error(`errors in ${board.id}:\n${info.errors.join("\n")}`)
+    }
+
     const description = $description || spec?.description
     const stores = unique([url, ...(spec?.storeLink || [])].filter(u => !!u))
     const r: string[] = [
@@ -136,14 +150,37 @@ description: ${devName}
             : undefined,
         `\n## Features\n`,
         ...info.features.map(f => `-  ${f}`),
+        `\n{@import optional ./${fdevId}-features.mdp}\n`,
         ...info.services.map(f => `-  Service: ${f}`),
+        `\n{@import optional ./${fdevId}-services.mdp}\n`,
+        !boardJson.i2c &&
+            `
+:::caution
+
+I2C pins are not [configured](/developer/board-configuration).
+
+:::
+`,
         `\n## Stores\n`,
         ...stores.map(url => `-  [${url}](${url})`),
         `\n## Pins\n`,
         `${renderPinout(info.pinInfoText)}\n\n`,
-        `\n## Firmware update
+        `\n## DeviceScript import\n`,
+        `
+You must add this import statement to load 
+the pinout configuration for this device.
 
 In [Visual Studio Code](/getting-started/vscode),
+click the **wand** icon on the file menu and 
+select "${devName}".
+`,
+        `\`\`\`ts
+import { pins, board } from "@dsboard/${devId}"
+\`\`\``,
+        `\n{@import optional ./${devId.replace(/_/g, "-")}-examples.mdp}`,
+        `\n## Firmware update
+
+In Visual Studio Code,
 select **DeviceScript: Flash Firmware...** from the command palette.
         
 Run this [command line](/api/cli) command and follow the instructions.
@@ -161,7 +198,7 @@ ${JSON.stringify(boardJson, null, 4)}
 \`\`\`
 `,
     ]
-    return r.filter(s => s !== undefined).join("\n")
+    return r.filter(s => !!s).join("\n")
 
     function renderPinout(pinout: string) {
         const pins = pinout.split(/\n/g).map(line => line.split(/[:,]/g))
@@ -176,6 +213,10 @@ ${JSON.stringify(boardJson, null, 4)}
     }
 }
 
+function boardIdToFilename(boardid: string) {
+    return boardid.replace(/_/g, "-")
+}
+
 export function boardMarkdownFiles() {
     const buildConfig = resolveBuildConfig()
     const { boards, archs } = buildConfig
@@ -184,27 +225,28 @@ export function boardMarkdownFiles() {
     const boardsjson: any = {}
     Object.keys(boards).forEach(boardid => {
         const board = boards[boardid]
-        const { archId, productId, devName } = board
+        const { archId, productId, devName, $description, url } = board
         if (!archId || archId === "wasm" || archId == "native") return
         const spec: jdspec.DeviceSpec =
             catalog.specificationFromProductIdentifier(parseAnyInt(productId))
         const aid = architectureFamily(archId)
-        const pa = `${aid}/${boardid.replace(/_/g, "-")}`
+        const pa = `${aid}/${boardIdToFilename(boardid)}`
         r[`${pa}.mdx`] = deviceConfigToMarkdown(
             board,
             archs[board.archId],
             spec
         )
 
+        const descr = ellipseFirstSentence($description) || ""
         const boardjson: any = board
         boardsjson[boardid] = boardjson
         const aidmd = `${aid}/boards.mdp`
-        const img = deviceCatalogImage(spec, "avatar")
-        if (img) {
+        const img = deviceCatalogImage(spec, "preview")
+        if (img && url) {
             r[aidmd] =
                 (r[aidmd] || "") +
                 `
-- [![photograph of ${devName}](${img}) ${devName}](/devices/${pa})`
+<DeviceCard image="${img}" href="/devices/${pa}" title="${devName}" description="${descr}" />`
             boardjson.img = deviceCatalogImage(spec, "catalog")
         }
     })
@@ -302,6 +344,9 @@ export function pinHasFunction(
 
 export interface PinInfo {
     label: string
+    silkLabel: string
+    commonLabel: string
+    functionLabel?: string
     gpio: number
     functions: PinFunction[]
 }
@@ -332,9 +377,27 @@ export function pinsInfo(arch: ArchConfig, devcfg: DeviceConfig) {
 
         infos.push({
             label,
+            commonLabel: label,
+            silkLabel: label,
+            functionLabel: label.includes(".") ? label : undefined,
             gpio,
             functions,
         })
+    }
+
+    function addPinExt(label: string, refOrGpio: number | string): unknown {
+        assert(label.includes("."))
+        if (typeof refOrGpio == "string") {
+            const ex = infos.find(p => p.commonLabel == refOrGpio)
+            if (!ex)
+                return errors.push(
+                    `${label} is set to ${refOrGpio} which wasn't found`
+                )
+            ex.functionLabel = label
+            ex.label = label // override
+            return
+        }
+        return addPin(label, refOrGpio)
     }
 
     for (const lbl of Object.keys(devcfg?.pins ?? {})) {
@@ -356,18 +419,31 @@ export function pinsInfo(arch: ArchConfig, devcfg: DeviceConfig) {
                 if (k.startsWith("#")) continue
                 const path = (path0 ? path0 + "." : "") + k
                 if (k != "pins" && k.startsWith("pin")) {
-                    addPin(path, obj[k])
+                    addPinExt(path, obj[k])
                 } else {
                     validateConfig(obj[k], path)
                 }
             }
     }
 
+    for (const [silkLabel, commonLabel] of Object.entries(devcfg.$pins ?? {})) {
+        const ex = infos.find(i => i.commonLabel == commonLabel)
+        if (ex) {
+            ex.label = silkLabel
+            ex.silkLabel = silkLabel
+        }
+    }
+
     validateConfig(devcfg, "")
 
     const desc = infos
         .filter(p => !p.label.startsWith("@"))
-        .map(p => `${p.label}: GPIO${p.gpio}, ${p.functions.join(", ")}`)
+        .map(
+            p =>
+                `${p.silkLabel}: GPIO${p.gpio}, ${
+                    p.functionLabel ? p.functionLabel + ", " : ""
+                }${p.functions.join(", ")}`
+        )
         .join("\n")
 
     return { desc, infos, errors }

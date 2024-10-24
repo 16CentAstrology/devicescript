@@ -1,4 +1,5 @@
 import * as ds from "@devicescript/core"
+import { Image } from "@devicescript/graphics"
 
 export class DriverError extends Error {
     constructor(message?: string) {

@@ -15,10 +15,8 @@
         "isolatedModules": true,
         "noImplicitAny": true,
         "moduleDetection": "force",
+        "jsx": "preserve",
         "types": []
     },
-    "include": [
-        "**/*.ts",
-        "../packages/core/src/*.d.ts"
-    ]
+    "include": ["**/*.ts", "**/*.tsx", "../packages/core/src/*.d.ts"]
 }

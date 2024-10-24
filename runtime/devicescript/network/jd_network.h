@@ -20,11 +20,11 @@ void jd_aes_clear_key(void);
 
 void jd_aes_ccm_encrypt(const uint8_t key[JD_AES_KEY_BYTES],
                         const uint8_t nonce[JD_AES_CCM_NONCE_BYTES],
-                        uint8_t tag[JD_AES_CCM_TAG_BYTES], uint8_t *plain, unsigned size);
+                        uint8_t tag[], unsigned tag_bytes, uint8_t *plain, unsigned size);
 
 int jd_aes_ccm_decrypt(const uint8_t key[JD_AES_KEY_BYTES],
                        const uint8_t nonce[JD_AES_CCM_NONCE_BYTES],
-                       uint8_t tag[JD_AES_CCM_TAG_BYTES], uint8_t *msg, unsigned size);
+                       uint8_t tag[], unsigned tag_bytes, uint8_t *msg, unsigned size);
 
 
 // this is used by DeviceScript Manager and implemented by default in software
@@ -46,6 +46,7 @@ void jd_sha256_hkdf(const void *salt, unsigned salt_size, const void *key, unsig
                     const void *info, unsigned info_size, const void *info2, unsigned info_size2,
                     uint8_t outkey[JD_SHA256_HASH_BYTES]);
 
+// duplicated in wasmpre.ts!
 #define JD_CONN_EV_OPEN 0x01
 #define JD_CONN_EV_CLOSE 0x02
 #define JD_CONN_EV_ERROR 0x03
@@ -64,6 +65,7 @@ int jd_websock_new(const char *hostname, int port, const char *path, const char 
 void jd_websock_on_event(unsigned event, const void *data, unsigned size);
 int jd_websock_send_message(const void *data, unsigned size);
 void jd_websock_close(void);
+extern void (*jd_tcpsock_on_event_override)(unsigned event, const void *data, unsigned size);
 
 // This is on encrypted packet transport level - messages are whole
 // and this will try to re-connect.
@@ -96,4 +98,6 @@ int jd_wifi_init(uint8_t mac_out[6]);
 int jd_wifi_disconnect(void);
 int jd_wifi_rssi(void);
 void jd_wifi_process(void);
+bool jd_wifi_available(void);
+
 #endif

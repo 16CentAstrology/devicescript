@@ -6,16 +6,46 @@ sidebar_position: 0
 
 This page links to various developer boards that have a DeviceScript runtime firmware.
 
-For sensors and other peripherals, see [servers](/api/servers).
+For sensors and other peripherals, see [drivers](/api/drivers).
 
-## Hardware status
+## Implementation status
 
-The ESP32-C3 and ESP32-S2 boards are best supported.
-The regular ESP32 (without -C3 or -S2) currently have issues with the USB connection (as it's handled by external chip).
+| Device       | USB | TCP | TLS | I2C | SPI | GPIO | PWM | WS2812B | Jacdac |
+| ------------ | --- | --- | --- | --- | --- | ---- | --- | ------- | ------ |
+| **WASM Sim** | N/A | ✓   | ✓   | ❌  | ❌  | ❌   | ❌  | ❌      | ✓      |
+| **ESP32**    | ⚠️  | ✓   | ✓   | ✓   | ✓   | ✓    | ✓   | ✓       | ✓      |
+| **ESP32-C3** | ✓   | ✓   | ✓   | ✓   | ✓   | ✓    | ✓   | ✓       | ✓      |
+| **ESP32-S2** | ✓   | ✓   | ❌  | ✓   | ✓   | ✓    | ✓   | ✓       | ✓      |
+| **ESP32-S3** | ✓   | ✓   | ✓   | ✓   | ✓   | ✓    | ✓   | ✓       | ✓      |
+| **RP2040**   | ✓   | ❌  | ❌  | ✓   | ✓   | ✓    | ✓   | ❌      | ✓      |
+| **RP2040-W** | ✓   | ✓   | ❌  | ✓   | ✓   | ✓    | ✓   | ❌      | ✓      |
 
-The RP2040 should generally work.
+-   [ESP32](/devices/esp32/)
+-   [RP2040](/devices/rp2040/)
+
+The PWM is currently only supported through servo, light bulb, buzzer and similar drivers.
+
+**The ESP32-C3 boards are best supported.**
+The regular ESP32 (without -C3 or -S2) currently have issues with the USB connection
+(as it's handled by external chip).
+The ESP32-S2 has limited memory which makes it difficult to use TLS.
+The ESP32-S3 is very recent and largely untested.
+
+The RP2040 should generally work, but TLS is not supported on Pico-W.
+
+:::note
+
+If you have ESP-IDF or Pico SDK expertise, we are actively looking for contributors to help
+with the C embedded runtime. You can look at the [ESP32 issues](https://github.com/microsoft/devicescript/labels/esp32)
+or the [RP2040 issues](https://github.com/microsoft/devicescript/labels/rp2040) for ideas.
+There's also an incomplete [STM32 port](https://github.com/microsoft/devicescript-stm32) if you
+want to contribute there. It's also possible to [port to a new MCU/SoC](/devices/add-soc).
+
+:::
 
 ## Board recommendations
+
+For [ESP32](/devices/esp32/),
 
 -   [Adafruit QT Py C3](/devices/esp32/adafruit-qt-py-c3) and [FeatherS2](/devices/esp32/feather-s2) have
     [Qwiic](https://www.sparkfun.com/qwiic) aka [STEMMA QT](https://learn.adafruit.com/introducing-adafruit-stemma-qt/what-is-stemma-qt)
@@ -24,24 +54,18 @@ The RP2040 should generally work.
     category but it's untested
 -   [Seeed Xiao ESP32C3](/devices/esp32/seeed-xiao-esp32c3)
 -   [ESP32-C3-RUST](/devices/esp32/esp32c3-rust-devkit) has a builtin temperature/humidity and light sensors, and RGB LED
--   [RPi Pico W](/devices/rp2040/pico-w) is also an option if you can do little soldering or have a breakout
 
-:::tip
+For [RP2040](/devices/rp2040/),
 
-Please contact us for support of other MCU archictures.
-
-:::
-
-## [ESP32](/devices/esp32/)
-
-{@import ./esp32/boards.mdp}
-
-## [RP2040](/devices/rp2040/)
-
-{@import ./rp2040/boards.mdp}
+-   [Raspberry Pi Pico](/devices/rp2040/pico)
 
 :::tip
 
 Your device is not in the list? [Add a new Device Configuration](/devices/add-board) in your project.
 
 :::
+
+## Shields
+
+It is also possible to create npm packages for [shields or breakouts](/devices/shields). Those packages
+typically configure the pins and drivers for a better experience.

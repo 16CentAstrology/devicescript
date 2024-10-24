@@ -33,6 +33,7 @@ import {
     log,
     verboseLog,
 } from "./command"
+import glob from "fast-glob"
 
 import type { DevsModule } from "@devicescript/vm"
 import { readFile, writeFile } from "node:fs/promises"
@@ -45,9 +46,9 @@ import {
     toHex,
     versionTryParse,
 } from "jacdac-ts"
-import { execSync } from "node:child_process"
 import { BuildOptions } from "./sideprotocol"
 import { readJSON5Sync } from "./jsonc"
+import { execCmd } from "./exec"
 
 // TODO should we move this to jacdac-ts and call automatically for transports?
 export function setupWebsocket() {
@@ -212,14 +213,6 @@ function toDevsDiag(d: jdspec.Diagnostic): DevsDiagnostic {
         endLine: d.line,
         endColumn: 100,
         formatted: "",
-    }
-}
-
-function execCmd(cmd: string) {
-    try {
-        return execSync(cmd, { encoding: "utf-8" }).trim()
-    } catch {
-        return ""
     }
 }
 
@@ -429,7 +422,8 @@ export async function compileFile(
     )
         throw new Error("./devsconfig.json file not found")
 
-    ensureDirSync(options.outDir || BINDIR)
+    const outDir = options.outDir || BINDIR
+    ensureDirSync(outDir)
 
     const folder = resolve(".")
     const entryPoint = relative(folder, fn)
@@ -452,7 +446,7 @@ export async function compileFile(
         res.dbg.binarySHA256 = toHex(await sha256([res.binary]))
         verboseLog(`sha: ${res.dbg.binarySHA256}`)
         writeFileSync(
-            join(folder, BINDIR, DEVS_DBG_FILE),
+            join(folder, outDir, DEVS_DBG_FILE),
             JSON.stringify(res.dbg)
         )
     }
@@ -499,18 +493,20 @@ export async function saveLibFiles(
     const customServices =
         buildConfig.services.filter(srv => srv.catalog !== undefined) || []
     // generate source files
-    for (const lang of ["ts", "c"]) {
-        const converter = converters()[lang]
-        let constants = ""
-        for (const srv of customServices) {
-            constants += converter(srv) + "\n"
-        }
-        const dir = join(pref, GENDIR, lang)
-        await mkdirp(dir)
-        await writeFile(join(dir, `constants.${lang}`), constants, {
-            encoding: "utf-8",
+    await Promise.all(
+        ["ts", "c"].map(async lang => {
+            const converter = converters()[lang]
+            let constants = ""
+            for (const srv of customServices) {
+                constants += converter(srv) + "\n"
+            }
+            const dir = join(pref, GENDIR, lang)
+            await mkdirp(dir)
+            return writeFile(join(dir, `constants.${lang}`), constants, {
+                encoding: "utf-8",
+            })
         })
-    }
+    )
     // json specs
     {
         const dir = join(pref, GENDIR)
@@ -523,6 +519,18 @@ export async function saveLibFiles(
             }
         )
     }
+}
+
+export async function buildAll(options: BuildOptions) {
+    await Promise.all(
+        (await glob("src/main*.ts")).map(file => {
+            log(`build ${file}`)
+            return build(file, {
+                ...options,
+                outDir: BINDIR + "/" + file.slice(8, -3),
+            })
+        })
+    )
 }
 
 export async function build(file: string, options: BuildOptions) {

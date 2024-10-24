@@ -30,12 +30,17 @@ import { DeviceScriptExtensionState } from "./state"
 import { Utils } from "vscode-uri"
 import { showConfirmBox, TaggedQuickPickItem } from "./pickers"
 import { EXIT_CODE_EADDRINUSE } from "../../cli/src/exitcodes"
-import { showInformationMessageWithHelp } from "./commands"
+import { showErrorWithHelp, showInformationMessageWithHelp } from "./commands"
 import { checkFileExists } from "./fs"
-import { ResolvedBuildConfig, VersionInfo } from "@devicescript/interop"
+import {
+    MIN_NODE_VERSION,
+    ResolvedBuildConfig,
+    VersionInfo,
+} from "@devicescript/interop"
 import { extensionVersion } from "./version"
 import { showError, showErrorMessage } from "./telemetry"
 import { BUILD, MESSAGE_PREFIX } from "./constants"
+import { tryGetNodeVersion } from "./spawn"
 
 function showTerminalError(message: string) {
     showInformationMessageWithHelp(
@@ -53,6 +58,13 @@ function normalizeUsedFiles(dir: vscode.Uri, usedFiles: string[]) {
 }
 
 const PROJECT_FOLDER_KEY = "devicescript.devtools.projectFolder"
+
+export async function resolveDevtoolsPath(route?: string) {
+    const target = vscode.Uri.parse(`http://localhost:8081/`)
+    let external = await vscode.env.asExternalUri(target)
+    if (route) external = Utils.joinPath(external, route)
+    return external
+}
 
 export class DeveloperToolsManager extends JDEventSource {
     private _connectionState: ConnectionState = ConnectionState.Disconnected
@@ -104,6 +116,10 @@ export class DeveloperToolsManager extends JDEventSource {
             vscode.commands.registerCommand(
                 "extension.devicescript.terminal.show",
                 () => this.show()
+            ),
+            vscode.commands.registerCommand(
+                "extension.devicescript.projet.upgrade",
+                async () => await this.upgradeTools()
             )
         )
 
@@ -145,29 +161,45 @@ export class DeveloperToolsManager extends JDEventSource {
         if (JSON.stringify(this._versions) !== JSON.stringify(versions)) {
             this._versions = versions
             const extv = extensionVersion()
+            const { devsVersion, runtimeVersion, nodeVersion, projectFolder } =
+                this
             console.debug(
-                `devicescript : vscode ${extv}, devtools ${this.devsVersion}, runtime ${this.runtimeVersion}, node ${this.nodeVersion}`
+                `devicescript : vscode ${extv}, devtools ${devsVersion}, runtime ${runtimeVersion}, node ${nodeVersion}`
             )
-            if (semverCmp(this.devsVersion, extv) < 0) {
-                // installed devs tool are outdated for the vscode addon
-                const { projectFolder } = this
-                this.clear()
-                const yes = await showConfirmBox(
-                    `DeviceScript - @devicescript/cli dependency is outdated, upgrade?`
+
+            // node.js version outdated
+            if (semverCmp(nodeVersion, `v${MIN_NODE_VERSION}.0.0`) < 0) {
+                throwError(
+                    `Node.js outdated (${nodeVersion}), v${MIN_NODE_VERSION}+ needed`,
+                    {
+                        cancel: true,
+                    }
                 )
-                if (yes) {
-                    const t = vscode.window.createTerminal({
-                        isTransient: true,
-                        name: "@devicescript/cli upgrade",
-                        cwd: projectFolder,
-                    })
-                    t.sendText("yarn upgrade @devicescript/cli@latest")
-                    t.show()
-                }
+            }
+
+            // installed devs tool are outdated for the vscode addon
+            if (semverCmp(devsVersion, extv) < 0) {
+                const yes = await showConfirmBox(
+                    `DeviceScript - @devicescript/cli is outdated (${devsVersion}), upgrade to latest (${extv}+) ?`
+                )
+                if (yes) await this.upgradeTools()
                 throwError("Dependencies outdated", { cancel: true })
             }
         }
         this.updateBuildConfig(buildConfig)
+    }
+
+    async upgradeTools() {
+        const { projectFolder } = this
+        if (!projectFolder) return
+
+        await this.kill()
+        await this.startPackageTool(
+            projectFolder,
+            "Upgrade DeviceScript tools",
+            "upgrade",
+            "@devicescript/cli"
+        )
     }
 
     updateBuildConfig(data: ResolvedBuildConfig) {
@@ -334,7 +366,7 @@ export class DeveloperToolsManager extends JDEventSource {
                             label: file,
                             description: this.projectFolder.fsPath,
                             data: file,
-                        } as TaggedQuickPickItem<string>)
+                        }) as TaggedQuickPickItem<string>
                 ),
                 {
                     title: "Pick an entry point file (main*.ts)",
@@ -437,7 +469,8 @@ export class DeveloperToolsManager extends JDEventSource {
 
     get boards() {
         let boards = Object.values(this.buildConfig?.boards || {})
-        if (!Flags.developerMode) boards = boards.filter(b => !!b.url)
+        if (!Flags.developerMode)
+            boards = boards.filter(b => !!b.url || b.$custom)
         return boards.sort((l, r) => {
             let c = -(l.url ? 1 : 0) + (r.url ? 1 : 0)
             if (c) return c
@@ -545,11 +578,18 @@ export class DeveloperToolsManager extends JDEventSource {
         await this.saveProjectFolder()
 
         try {
+            const args = ["devtools", "--vscode"]
+            const config = vscode.workspace.getConfiguration(
+                "devicescript.devtools"
+            )
+            const localhost = !!config.get("localhost")
+            if (localhost) args.push("--localhost")
+
             this.connectionState = ConnectionState.Connecting
             const t = await this.createCliTerminal({
                 title: "DeviceScript",
                 progress: "Starting Development Server...",
-                args: ["devtools", "--vscode"],
+                args,
                 message: "DeviceScript Development Server\n",
             })
             if (!t) {
@@ -610,6 +650,7 @@ export class DeveloperToolsManager extends JDEventSource {
             await sideRequest<SideKillReq, SideKillResp>({
                 req: "kill",
                 data: {},
+                timeout: 1000,
             })
             // process acknoledged the message
             return true
@@ -619,16 +660,18 @@ export class DeveloperToolsManager extends JDEventSource {
     }
 
     private async kill() {
-        this.sendKillRequest()
+        await this.sendKillRequest()
         const p = this._terminalPromise
         this.clear()
         if (p) {
-            const t = await p
-            if (t) {
-                try {
-                    t.sendText("\u001c")
-                } catch {}
-            }
+            await delay(1000)
+            p.then(t => {
+                if (t) {
+                    try {
+                        t.sendText("\u001c")
+                    } catch {}
+                }
+            })
         }
     }
 
@@ -760,12 +803,62 @@ export class DeveloperToolsManager extends JDEventSource {
         terminal?.show()
     }
 
+    private async resolvePackageTool(
+        cwd: vscode.Uri,
+        command: string,
+        args?: string[]
+    ) {
+        if (!cwd) return "npm"
+        const yarn = await checkFileExists(cwd, "yarn.lock")
+        let cmd = yarn ? "yarn" : "npm"
+        if (command) {
+            args = args || []
+            if (yarn) {
+                command =
+                    {
+                        ["install"]: "add",
+                    }[command] || command
+            }
+            cmd += " " + command
+            if (args?.length) cmd += " " + unique(args).join(" ")
+        }
+        return cmd
+    }
+
+    private get nodePath() {
+        const devToolsConfig = vscode.workspace.getConfiguration(
+            "devicescript.devtools"
+        )
+        const nodePath = devToolsConfig.get("node") as string
+        return nodePath || "node"
+    }
+
+    public async startPackageTool(
+        cwd: vscode.Uri,
+        title: string,
+        command: string,
+        ...args: string[]
+    ) {
+        const cmd = await this.resolvePackageTool(cwd, command, args)
+        const t = vscode.window.createTerminal({
+            name: title,
+            cwd: cwd.fsPath,
+            isTransient: true,
+        })
+        t.sendText(cmd)
+        t.show(true)
+        return t
+    }
+
+    private lastCreateCliFailed = false
     public async createCliTerminal(options: {
         title?: string
         progress: string
         useShell?: boolean
+        verbose?: boolean
         diagnostics?: boolean
         developerMode?: boolean
+        internet?: boolean
         message?: string
         args: string[]
     }): Promise<vscode.Terminal> {
@@ -783,20 +876,38 @@ export class DeveloperToolsManager extends JDEventSource {
         const cliBin = "./node_modules/.bin/devicescript"
         const cliInstalled = await checkFileExists(cwd, cliBin)
         if (!cliInstalled) {
-            showErrorMessage(
+            const v = await tryGetNodeVersion(
+                this.nodePath,
+                Utils.joinPath(cwd, ".devicescript/node.version")
+            )
+            if (!v) {
+                showErrorWithHelp(
+                    "terminal.nodemissing",
+                    "Unable to locate Node.JS."
+                )
+                return undefined
+            }
+            if (!(v.major >= MIN_NODE_VERSION)) {
+                showErrorMessage(
+                    "terminal.nodeversion",
+                    `Node.JS version outdated, found ${v.major}.${v.minor} but needed v${MIN_NODE_VERSION}+.`
+                )
+                return undefined
+            }
+
+            showErrorWithHelp(
                 "terminal.notinstalled",
-                "Install Node.JS dependencies to enable tools.",
+                "Install @devicescript/cli package.",
                 "Install"
-            ).then((res: string) => {
-                if (res === "Install") {
-                    const t = vscode.window.createTerminal({
-                        name: "Install Node.JS dependencies",
-                        cwd: cwd.fsPath,
-                        isTransient: true,
-                    })
-                    t.sendText("yarn install")
-                    t.show()
-                }
+            ).then(async (res: string) => {
+                if (res === "Install")
+                    await this.startPackageTool(
+                        cwd,
+                        "Install Node.JS dependencies",
+                        "install",
+                        "-D",
+                        "@devicescript/cli@latest"
+                    )
             })
             return undefined
         }
@@ -816,24 +927,36 @@ export class DeveloperToolsManager extends JDEventSource {
                     "devicescript.jacdac"
                 )
                 const isWindows = globalThis.process?.platform === "win32"
+                const isLinux = globalThis.process?.platform === "linux"
                 const useShell =
-                    options.useShell ?? !!devToolsConfig.get("shell")
-                const nodePath = devToolsConfig.get("node") as string
+                    this.lastCreateCliFailed ||
+                    (options.useShell ?? !!devToolsConfig.get("shell"))
+                const nodePath = this.nodePath
+                const verbose = options.verbose ?? devToolsConfig.get("verbose")
                 const diagnostics =
                     options.diagnostics ?? jacdacConfig.get("diagnostics")
                 const developerMode =
                     options.developerMode ?? devToolsConfig.get("developerMode")
+                const internet =
+                    options.internet || !!devToolsConfig.get("internet")
                 let cli = nodePath || "node"
+                if(isLinux) {
+                    cli = "";
+                }
                 if (isWindows) {
                     cli = "node_modules\\.bin\\devicescript.cmd"
                 } else args.unshift("./node_modules/.bin/devicescript")
                 if (diagnostics) args.push("--diagnostics", "--verbose")
                 if (developerMode) args.push("--dev")
+                if (internet) args.push("--internet")
+                if (verbose) args.push("--verbose")
                 console.debug(
                     `create terminal: ${useShell ? "shell:" : ""}${
                         cwd.fsPath
                     }> ${cli} ${args.join(" ")}`
                 )
+
+                this.lastCreateCliFailed = false
                 const terminalOptions: vscode.TerminalOptions = {
                     name: "DeviceScript" || title,
                     hideFromUser: false,
@@ -848,6 +971,7 @@ export class DeveloperToolsManager extends JDEventSource {
                 if (useShell) {
                     t.sendText("", true)
                     t.sendText(`${cli} ${args.join(" ")}`, true)
+                    if (this.lastCreateCliFailed) t.show(true)
                 }
                 let retry = 0
                 let inited = false
@@ -859,6 +983,7 @@ export class DeveloperToolsManager extends JDEventSource {
                 }
                 if (!inited) {
                     this.clear()
+                    this.lastCreateCliFailed = true
                     return undefined
                 }
 

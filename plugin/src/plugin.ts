@@ -41,6 +41,10 @@ function init(modules: {
                                 "@devicescript/settings",
                                 "@devicescript/drivers",
                                 "@devicescript/gpio",
+                                "@devicescript/spi",
+                                "@devicescript/graphics",
+                                "@devicescript/crypto",
+                                "@devicescript/net",
                                 "@devicescript/runtime",
                             ]) {
                                 json.peerDependencies[n] = "*"

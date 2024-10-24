@@ -1,12 +1,27 @@
 # DeviceScript bytecode spec
 
-Expressions do not modify the state. They may throw exceptions though.
+This file documents bytecode format for DeviceScript.
+A [C header file](https://github.com/microsoft/devicescript/blob/main/runtime/devicescript/devs_bytecode.h)
+and a [TypeScript file](https://github.com/microsoft/devicescript/blob/main/compiler/src/bytecode.ts) are generated from it.
+Additional structures are defined in [devs_format.h](https://github.com/microsoft/devicescript/blob/main/runtime/devicescript/devs_format.h).
+
+A DeviceScript bytecode file contains magic and version numbers followed by a number of binary sections
+defining functions, various literals (floats, ASCII strings, Unicode strings, buffers),
+Jacdac service specifications, and runtime configuration (`configureHardware()` and built-in servers).
+
+Functions are sequences of opcodes defined below.
+Opcodes are divided into expressions (with return type) which do not modify state,
+and statements (no return type; `ret_val()` expression is used to retrieve the logical
+result of a last statement).
+Many opcodes (both expressions and statements) can also throw an exception.
+
+For a more highlevel description of runtime and bytecode, see [Runtime implementation page](/language/runtime).
 
 ## Format Constants
 
     img_version_major = 2
-    img_version_minor = 9
-    img_version_patch = 10
+    img_version_minor = 16
+    img_version_patch = 4
     img_version = $version
     magic0 = 0x53766544 // "DevS"
     magic1 = 0xf1296e0a
@@ -18,7 +33,7 @@ Expressions do not modify the state. They may throw exceptions though.
     utf8_header_size = 4
     utf8_table_shift = 4
     binary_size_align = 32
-    max_stack_depth = 10
+    max_stack_depth = 16
     max_call_depth = 100
     direct_const_op = 0x80
     direct_const_offset = 16
@@ -192,7 +207,7 @@ Shorthand to `index(obj, static_utf8_string(utf8_idx))`
 
     load_buffer(buffer, numfmt, offset): number = 43
 
-    ret_val: any = 44
+    ret_val(): any = 44
 
 Return value of query register, call, etc.
 
@@ -255,6 +270,8 @@ Check if value is precisely `null` or `undefined`.
 Same as `x | 0`.
 
     fun add(x, y): number = 58     // x + y
+
+Note that this also works on strings, etc.
 
     fun sub(x, y): number = 59     // x - y
 
@@ -422,11 +439,13 @@ Only `true` and `false` values.
 
     null = 12
 
+    image = 13
+
 ### Object_Types only used in static type info
 
-    any = 11
+    any = 14
 
-    void = 12
+    void = 15
 
 ## Enum: BuiltIn_Object
 
@@ -470,6 +489,10 @@ Only `true` and `false` values.
     DsServiceSpec_prototype = 37
     DsPacketSpec = 38
     DsPacketSpec_prototype = 39
+    Image = 40
+    Image_prototype = 41
+    GPIO = 42
+    GPIO_prototype = 43
 
 ## Enum: BuiltIn_String
 
@@ -644,3 +667,59 @@ Only `true` and `false` values.
     delay = 167
     fromCharCode = 168
     _allocRole = 169
+    spiConfigure = 170
+    spiXfer = 171
+    _socketOpen = 172
+    _socketClose = 173
+    _socketWrite = 174
+    _socketOnEvent = 175
+    open = 176
+    close = 177
+    error_ = 178 // error
+    data = 179
+    toUpperCase = 180
+    toLowerCase = 181
+    indexOf = 182
+    byteLength = 183
+    Image = 184
+    width = 185
+    height = 186
+    bpp = 187
+    get = 188
+    clone = 189
+    set = 190
+    fill = 191
+    flipX = 192
+    flipY = 193
+    transposed = 194
+    drawImage = 195
+    drawTransparentImage = 196
+    overlapsWith = 197
+    fillRect = 198
+    drawLine = 199
+    equals = 200
+    isReadOnly = 201
+    fillCircle = 202
+    blitRow = 203
+    blit = 204
+    _i2cTransaction = 205
+    _twinMessage = 206
+    spiSendImage = 207
+    gpio = 208
+    label = 209
+    mode = 210
+    capabilities = 211
+    value = 212
+    setMode = 213
+    fillRandom = 214
+    encrypt = 215
+    decrypt = 216
+    digest = 217
+    ledStripSend = 218
+    rotate = 219
+    register = 220
+    event = 221
+    action = 222
+    report = 223
+    type = 224
+    byCode = 225

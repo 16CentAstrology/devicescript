@@ -257,8 +257,12 @@ static const uint8_t builtin_proto_idx[] = {
     [DEVS_BUILTIN_OBJECT_DSROLE_PROTOTYPE] = 6,
     [DEVS_BUILTIN_OBJECT_DSEVENT_PROTOTYPE] = 7,
     [DEVS_BUILTIN_OBJECT_DEVICESCRIPT] = 8,
+    [DEVS_BUILTIN_OBJECT_IMAGE_PROTOTYPE] = 9,
+    [DEVS_BUILTIN_OBJECT_BUFFER] = 10,
+    [DEVS_BUILTIN_OBJECT_GPIO_PROTOTYPE] = 11,
+    [DEVS_BUILTIN_OBJECT_GPIO] = 12,
 };
-#define MAX_PROTO 8
+#define MAX_PROTO 12
 
 devs_maplike_t *devs_get_builtin_object(devs_ctx_t *ctx, unsigned idx) {
     if (idx < sizeof(builtin_proto_idx)) {
@@ -710,6 +714,7 @@ static devs_maplike_t *devs_object_get_attached(devs_ctx_t *ctx, value_t v, unsi
         [DEVS_OBJECT_TYPE_FUNCTION] = DEVS_BUILTIN_OBJECT_FUNCTION_PROTOTYPE,
         [DEVS_OBJECT_TYPE_STRING] = DEVS_BUILTIN_OBJECT_STRING_PROTOTYPE,
         [DEVS_OBJECT_TYPE_BUFFER] = DEVS_BUILTIN_OBJECT_BUFFER_PROTOTYPE,
+        [DEVS_OBJECT_TYPE_IMAGE] = DEVS_BUILTIN_OBJECT_IMAGE_PROTOTYPE,
         [DEVS_OBJECT_TYPE_BOOL] = DEVS_BUILTIN_OBJECT_BOOLEAN_PROTOTYPE,
         [DEVS_OBJECT_TYPE_EXOTIC] = DEVS_BUILTIN_OBJECT_OBJECT_PROTOTYPE,
     };
@@ -813,6 +818,10 @@ static devs_maplike_t *devs_object_get_attached(devs_ctx_t *ctx, value_t v, unsi
     case DEVS_GC_TAG_BUFFER:
         attached = &((devs_buffer_t *)obj)->attached;
         builtin = DEVS_BUILTIN_OBJECT_BUFFER_PROTOTYPE;
+        break;
+    case DEVS_GC_TAG_IMAGE:
+        attached = &((devs_gimage_t *)obj)->attached;
+        builtin = DEVS_BUILTIN_OBJECT_IMAGE_PROTOTYPE;
         break;
     case DEVS_GC_TAG_ARRAY:
         attached = &((devs_array_t *)obj)->attached;
@@ -1136,8 +1145,19 @@ int devs_array_insert(devs_ctx_t *ctx, devs_array_t *arr, unsigned idx, int coun
     return 0;
 }
 
+int32_t devs_arg_int_defl(devs_ctx_t *ctx, unsigned idx, int32_t defl) {
+    value_t arg = devs_arg(ctx, idx);
+    if (devs_is_null_or_undefined(arg))
+        return defl;
+    return devs_value_to_int(ctx, arg);
+}
+
 int32_t devs_arg_int(devs_ctx_t *ctx, unsigned idx) {
     return devs_value_to_int(ctx, devs_arg(ctx, idx));
+}
+
+bool devs_arg_bool(devs_ctx_t *ctx, unsigned idx) {
+    return devs_value_to_bool(ctx, devs_arg(ctx, idx));
 }
 
 double devs_arg_double(devs_ctx_t *ctx, unsigned idx) {
@@ -1190,6 +1210,7 @@ bool devs_can_attach(devs_ctx_t *ctx, value_t v) {
     case DEVS_OBJECT_TYPE_ROLE:
     case DEVS_OBJECT_TYPE_ARRAY:
     case DEVS_OBJECT_TYPE_BUFFER:
+    case DEVS_OBJECT_TYPE_IMAGE:
         return true;
     default:
         return false;

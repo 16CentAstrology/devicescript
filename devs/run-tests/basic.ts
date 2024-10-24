@@ -1,5 +1,5 @@
 import * as ds from "@devicescript/core"
-import { _panic } from "@devicescript/core"
+import { assert, _panic } from "@devicescript/core"
 
 function isClose(x: number, y: number): void {
     if (isNaN(x) && isNaN(y)) return
@@ -228,6 +228,29 @@ function testBuffer() {
     isEq(buf[2], 0x33)
     isEq(buf[3], 0x12)
     isEq(buf[4], 0x13)
+
+    const b3 = hex`
+        72 // comment
+        33 23 // something
+        12`
+    isEq(b2.toString("hex"), b3.toString("hex"))
+
+    const buf2 = hex`01 02 03 04`.slice()
+    buf2.rotate(1)
+    isEq(buf2.toString("hex"), "02030401")
+    buf2.rotate(-1)
+    isEq(buf2.toString("hex"), "01020304")
+    buf2.rotate(1, 0, 2)
+    isEq(buf2.toString("hex"), "02010304")
+    buf2.rotate(-1, 0, 2)
+    isEq(buf2.toString("hex"), "01020304")
+    buf2.rotate(-10, 1, 3)
+    isEq(buf2.toString("hex"), "01020304")
+    buf2.rotate(-1, 1, 4)
+    isEq(buf2.toString("hex"), "01040203")
+    buf2.rotate(1, 1, 4)
+    buf2.rotate(-4, 1, 4)
+    isEq(buf2.toString("hex"), "01040203")
 }
 
 function three(a: number, b: number, c: number) {
@@ -480,6 +503,14 @@ function testInstanceOf() {
     const obj = {}
     isEq(obj instanceof Object, true)
     isEq(obj instanceof Error, false)
+
+    const json = JSON.parse("{}")
+    isEq(json instanceof Object, true)
+    isEq(json instanceof Error, false)
+
+    const foo = new Foo(12)
+    isEq(foo instanceof Object, true)
+    isEq(foo instanceof Foo, true)
 }
 
 class Foo {
@@ -1024,6 +1055,153 @@ function testStatic() {
     ds.assert((f as any).qux === undefined)
 }
 
+/**
+ * Foo
+ *
+ * @devsWhenUsed
+ */
+class Foo2 {
+    meth1() {}
+    meth2() {}
+}
+function testWhenUsed() {
+    ds.keep(Foo2.prototype.meth1)
+    const f: any = new Foo2()
+    ds.assert(f["meth1"] !== undefined)
+    ds.assert(f["meth2"] === undefined)
+}
+
+function testStringMethods() {
+    const a = ds._id("F") + "oo"
+    ds.assert(a.toLowerCase() === "foo")
+    ds.assert(a.toUpperCase() === "FOO")
+    ds.assert("foobarbaz".includes("bar") === true)
+    ds.assert("foobarbaz".includes("bar", 4) === false)
+    ds.assert("foobarbaz".startsWith("foo") === true)
+    ds.assert("foobarbaz".startsWith("bar", 3) === true)
+    ds.assert("foobarbaz".endsWith("baz") === true)
+    ds.assert("foobarbaz".endsWith("bar", 6) === true)
+    ds.assert("foobarbaz".indexOf("baz") === 6)
+    ds.assert("foobarbaz".indexOf("foo") === 0)
+    ds.assert("foobarbaz".indexOf("foo", 1) === -1)
+    ds.assert("ffoo".startsWith("foo") === false)
+    ds.assert("ffoo".endsWith("fo") === false)
+
+    const buf = hex`0011223322`
+    ds.assert(buf.indexOf(0x00) === 0)
+    ds.assert(buf.indexOf(0x22) === 2)
+    ds.assert(buf.indexOf(0x42) === -1)
+    ds.assert(buf.indexOf(0x11, 2) === -1)
+    ds.assert(buf.indexOf(0x11, 1) === 1)
+    ds.assert(buf.indexOf(0x22, 0, 2) === -1)
+
+    console.log(buf.indexOf(0x22, 0, -buf.length))
+    console.log(buf.lastIndexOf(0x22))
+    ds.assert(buf.lastIndexOf(0x22) === 4)
+}
+
+function testObjArrayCtor() {
+    function testArr(a: any[], len = 5) {
+        ds.assert(a.length === len)
+        ds.assert(a[0] === undefined)
+    }
+    testArr(Array(), 0)
+    testArr(Array(0), 0)
+    testArr([], 0)
+    testArr(Array(5))
+    testArr(new Array(5))
+
+    ds.assert(new Object() !== new Object())
+    ds.assert(Object() !== Object())
+    ds.assert(JSON.stringify(Object()) === "{}")
+    ds.assert(JSON.stringify(new Object()) === "{}")
+    const o = { x: 1 }
+    ds.assert(new Object(o) === o)
+    ds.assert(Object(o) === o)
+
+    function arrEq(a: any, b: any) {
+        const aa = JSON.stringify(a)
+        const bb = JSON.stringify(b)
+        ds.assert(aa === bb)
+    }
+    arrEq(["A"], Array("A"))
+    arrEq(["A", "B"], Array("A", "B"))
+    arrEq([1, 2], Array(1, 2))
+    arrEq(["A"], new Array("A"))
+    arrEq(["A", "B"], new Array("A", "B"))
+    arrEq([1, 2], new Array(1, 2))
+}
+
+function testForIn() {
+    const obj = { a: 1, b: "bar" }
+    let idx = 0
+    for (const k in obj) {
+        if (idx === 0) ds.assert(k === "a")
+        if (idx === 1) ds.assert(k === "b")
+        ds.assert(idx <= 1)
+        idx++
+    }
+}
+
+function testQQ() {
+    testQQu(undefined)
+    testQQu(null)
+    testQQd(12)
+    testQQd(false)
+    testQQd(0)
+    testQQd(7)
+
+    function testQQu(v: number) {
+        ds.assert((v ?? 7) === 7)
+        ds.assert((v ?? null) === null)
+        ds.assert((v ?? undefined) === undefined)
+    }
+
+    function fail() {
+        ds.assert(false)
+        return 0
+    }
+
+    function testQQd(v: any) {
+        ds.assert((v ?? 7) === v)
+        ds.assert((v ?? fail()) === v)
+    }
+}
+function testArgCaching() {
+    let x = 1
+
+    const incrX = () => {
+        x++
+        return 7
+    }
+
+    const show2 = (x: number, y: number, z: number) => {
+        assert(x === 1)
+        assert(y === 7)
+        assert(z === 2)
+    }
+
+    show2(x, incrX(), x)
+    assert(x === 2)
+}
+
+function testArraySpread() {
+    const a = [1, 2]
+    const b: number[] = []
+    const c = [7, 8, 9]
+    assert(JSON.stringify([...a]) === "[1,2]")
+    assert(JSON.stringify([...a, ...c]) === "[1,2,7,8,9]")
+    assert(JSON.stringify([0, ...a, ...c]) === "[0,1,2,7,8,9]")
+    assert(JSON.stringify([0, ...a, 11, ...c]) === "[0,1,2,11,7,8,9]")
+    assert(JSON.stringify([0, ...a, ...b, 11, ...c]) === "[0,1,2,11,7,8,9]")
+    assert(
+        JSON.stringify([...b, 0, ...a, ...b, 11, ...c]) === "[0,1,2,11,7,8,9]"
+    )
+}
+
+testArgCaching()
+testArraySpread()
+
 testFlow()
 if (x !== 42) _panic(10)
 testMath()
@@ -1064,5 +1242,12 @@ testHex()
 testAssignmentChaining()
 new UsingCtorFieldArgs(12)
 testStatic()
+testWhenUsed()
+testStringMethods()
+testObjArrayCtor()
+testForIn()
+testQQ()
+testArgCaching()
+testArraySpread()
 
 console.log("all OK")

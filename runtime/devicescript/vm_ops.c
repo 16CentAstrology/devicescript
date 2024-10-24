@@ -33,8 +33,10 @@ static void stmt0_alloc_map(devs_activation_t *frame, devs_ctx_t *ctx) {
 
 static void stmt1_alloc_array(devs_activation_t *frame, devs_ctx_t *ctx) {
     uint32_t sz = devs_vm_pop_arg_u32(ctx);
-    set_alloc(frame, ctx, devs_array_try_alloc(ctx, sz),
-              sizeof(devs_array_t) + sz * sizeof(value_t));
+    devs_array_t *arr = devs_array_try_alloc(ctx, sz);
+    set_alloc(frame, ctx, arr, sizeof(devs_array_t) + sz * sizeof(value_t));
+    if (arr)
+        arr->length = 0; // size is only suggestion
 }
 
 static void stmt1_alloc_buffer(devs_activation_t *frame, devs_ctx_t *ctx) {
@@ -84,7 +86,9 @@ static void stmt_callN(devs_activation_t *frame, devs_ctx_t *ctx, unsigned N) {
 }
 
 #define STMT_CALL(n, k)                                                                            \
-    static void n(devs_activation_t *frame, devs_ctx_t *ctx) { stmt_callN(frame, ctx, k); }
+    static void n(devs_activation_t *frame, devs_ctx_t *ctx) {                                     \
+        stmt_callN(frame, ctx, k);                                                                 \
+    }
 
 STMT_CALL(stmt1_call0, 0)
 STMT_CALL(stmt2_call1, 1)
@@ -479,6 +483,7 @@ static const uint8_t typeof_map[] = {
     [DEVS_OBJECT_TYPE_MAP] = DEVS_BUILTIN_STRING_OBJECT,
     [DEVS_OBJECT_TYPE_ARRAY] = DEVS_BUILTIN_STRING_OBJECT,
     [DEVS_OBJECT_TYPE_BUFFER] = DEVS_BUILTIN_STRING_OBJECT,
+    [DEVS_OBJECT_TYPE_IMAGE] = DEVS_BUILTIN_STRING_OBJECT,
     [DEVS_OBJECT_TYPE_ROLE] = DEVS_BUILTIN_STRING_OBJECT,
     [DEVS_OBJECT_TYPE_BOOL] = DEVS_BUILTIN_STRING_BOOLEAN,
     [DEVS_OBJECT_TYPE_FIBER] = DEVS_BUILTIN_STRING_OBJECT,

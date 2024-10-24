@@ -192,6 +192,7 @@ declare module "@devicescript/core" {
         readonly classIdentifier: number
         assign(packet: Packet): void
         lookup(name: string): PacketSpec
+        byCode(code: number): PacketSpec
     }
 
     export class PacketSpec<T = any> {
@@ -199,8 +200,14 @@ declare module "@devicescript/core" {
         readonly name: string
         readonly code: number
         readonly response?: PacketSpec
+        readonly type: "action" | "register" | "report" | "event"
         encode(v: T): Packet
     }
+
+    export type EventSpec<T = any> = PacketSpec<T> & { type: "event" }
+    export type RegisterSpec<T = any> = PacketSpec<T> & { type: "register" }
+    export type ActionSpec<T = any> = PacketSpec<T> & { type: "action" }
+    export type ReportSpec<T = any> = PacketSpec<T> & { type: "report" }
 
     export interface ServerInterface {
         serviceIndex: number
@@ -291,6 +298,7 @@ declare module "@devicescript/core" {
 
     /**
      * Wait for a given emitter to be activated.
+     * Returns `undefined` when `timeout` expires (defaults to Infinity).
      */
     export function wait<T>(l: Subscriber<T>, timeout?: number): Promise<T>
 
@@ -351,24 +359,17 @@ declare module "@devicescript/core" {
     ): string
 
     /**
+     * Send message to the twin in the dashboard.
+     */
+    export function _twinMessage(
+        topic: string,
+        data: string | Buffer
+    ): Promise<void>
+
+    /**
      * Return hex-encoded device 64 bit device identifier of the current device or its server counterpart
      */
     export function deviceIdentifier(which: "self" | "server"): string
-
-    /**
-     * Internal, used in server impl.
-     * @deprecated
-     */
-    export function _onServerPacket(pkt: Packet): Promise<void>
-
-    /**
-     * Internal, used in server impl.
-     * @deprecated
-     */
-    export function _serverSend(
-        serviceIndex: number,
-        pkt: Packet
-    ): Promise<void>
 
     /**
      * Throw an exception if the condition is not met.
@@ -414,7 +415,14 @@ declare module "@devicescript/core" {
             private constructor()
 
             static alloc(size: number): Buffer
-            static from(data: string | Buffer | number[]): Buffer
+
+            static from(
+                data: string,
+                encoding?: undefined | "utf-8" | "utf8" | "hex"
+            ): Buffer
+            static from(data: Buffer | number[]): Buffer
+
+            static concat(...buffers: Buffer[]): Buffer
 
             /**
              * Gets the length in bytes of the buffer
@@ -430,6 +438,22 @@ declare module "@devicescript/core" {
                 len: number
             ): void
             fillAt(offset: number, length: number, value: number): void
+            /**
+             * Return index of specified byte in buffer or -1 if not found.
+             * @param byte
+             * @param startOffset defaults to 0
+             * @param endOffset defaults to buffer length (`endOffset < 0` has special meaning)
+             */
+            indexOf(
+                byte: number,
+                startOffset?: number,
+                endOffset?: number
+            ): number
+            lastIndexOf(
+                byte: number,
+                startOffset?: number,
+                endOffset?: number
+            ): number
             [idx: number]: number
 
             toString(encoding?: "hex" | "utf-8" | "utf8"): string
@@ -437,6 +461,14 @@ declare module "@devicescript/core" {
             set(from: Buffer, targetOffset?: number): void
             concat(other: Buffer): Buffer
             slice(from?: number, to?: number): Buffer
+
+            /**
+             * Rotate buffer left in place.
+             * @param offset number of bytes to shift; use negative value to shift right
+             * @param from start offset in buffer. Default is 0.
+             * @param to end offset in buffer. Defaults to buffer length.
+             */
+            rotate(shift: number, from?: number, to?: number): void
         }
 
         /**
@@ -519,12 +551,17 @@ declare module "@devicescript/core" {
 
     export interface PinBase {
         _pinBrand: unknown
+
+        /**
+         * Hardware pin number
+         */
+        gpio: number
     }
 
     /**
      * Represents pin capable of digital output.
      */
-    export interface InputPin extends PinBase, Subscriber<DigitalValue> {
+    export interface InputPin extends PinBase {
         _inputPinBrand: unknown
     }
 

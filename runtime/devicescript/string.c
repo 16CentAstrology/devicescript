@@ -101,8 +101,8 @@ value_t devs_string_sprintf(devs_ctx_t *ctx, const char *format, ...) {
     return r;
 }
 
-value_t devs_string_from_utf8(devs_ctx_t *ctx, const uint8_t *utf8, unsigned len) {
-    devs_any_string_t *s = devs_string_try_alloc_init(ctx, (const char *)utf8, len);
+value_t devs_string_from_utf8(devs_ctx_t *ctx, const uint8_t *utf8, unsigned size) {
+    devs_any_string_t *s = devs_string_try_alloc_init(ctx, (const char *)utf8, size);
     if (s == NULL) {
         return devs_undefined;
     } else {
@@ -184,6 +184,11 @@ value_t devs_value_to_string(devs_ctx_t *ctx, value_t v) {
             return devs_string_sprintf(ctx, "[Packet: %s cmd=%x sz=%d]",
                                        devs_role_name(ctx, pkt->roleidx), pkt->service_command,
                                        pkt->payload->length);
+        }
+        case DEVS_GC_TAG_IMAGE: {
+            devs_gimage_t *img = devs_handle_ptr_value(ctx, v);
+            return devs_string_sprintf(ctx, "[Image: %dx%d (%d bpp)]", img->width, img->height,
+                                       img->bpp);
         }
         case DEVS_GC_TAG_SHORT_MAP:
         case DEVS_GC_TAG_HALF_STATIC_MAP:

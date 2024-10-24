@@ -1,12 +1,18 @@
+import DeviceCard from "@site/src/components/DeviceCard"
+
 # RP2040
 
-The following devices use the firmware from https://github.com/microsoft/jacdac-pico.
+The following devices use the firmware from https://github.com/microsoft/devicescript-pico
+which builds on top of the pico-sdk.
 
 {@import ./boards.mdp}
 
-:::tip
+:::note
 
-Your device is not in the list? [Add a new Device Configuration](/devices/add-board) in your project.
+The pico-w networking stack (cloud, etc...) is currently not well supported.
+We are currently focusing on best support on [ESP32](/devices/esp32/).
+
+If you have expertise with the pico SDK, your contribution is welcome to fill the gaps.
 
 :::
 

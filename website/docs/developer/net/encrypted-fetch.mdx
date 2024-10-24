@@ -1,0 +1,230 @@
+---
+title: Encrypted Fetch
+sidebar_position: 14.5
+---
+
+# Encrypted Fetch
+
+The `@devicescript/net` package contains `encryptedFetch()` function which lets you
+HTTP POST encrypted data and read encrypted responses.
+The encryption uses `aes-256-ccm`.
+
+Let's see how this works!
+
+First, set up a `main.ts` file:
+
+```ts
+import { assert } from "@devicescript/core"
+import { URL, encryptedFetch } from "@devicescript/net"
+import { readSetting } from "@devicescript/settings"
+
+async function sendReq(data: any) {
+    const url = new URL(await readSetting<string>("ENC_HTTP_URL"))
+    const password = url.hash.split("pass=")[1]
+    assert(
+        password !== "SecretPassword",
+        "Please change password in production!"
+    )
+    url.hash = ""
+    return await encryptedFetch({
+        data,
+        password,
+        url,
+    })
+}
+console.log(
+    await sendReq({
+        hello: "world",
+    })
+)
+```
+
+Second, create a settings file with secrets.
+
+```env title="./.env.local"
+# Local settings and secrets
+# This file should **NOT** tracked by git
+# Make sure to put the value below in "..."; otherwise the # gets treated as comment
+ENC_HTTP_URL="http://localhost:8080/api/devs-enc-fetch/mydevice#pass=SecretPassword"
+```
+
+In production, you may want to use `deviceIdentifier('self')` as the user name,
+provided you handle that server-side.
+
+On the server side, you can run the code below.
+Feel free to adopt to other languages or frameworks.
+
+:::warning
+
+Two devices should never share a key.
+
+:::
+
+```ts skip
+import express from "express"
+import bodyParser from "body-parser"
+import * as crypto from "node:crypto"
+import { config } from "dotenv"
+
+function getPasswordForDevice(deviceId: string): string | undefined {
+    // TODO look up device in database here!
+
+    config({ path: "./.env.local" })
+    const url = new URL(process.env["ENC_HTTP_URL"] + "")
+    if (url.pathname.replace(/.*\//, "") == deviceId) {
+        const pass = url.hash.split("pass=")[1]
+        if (pass !== "SecretPassword") return pass
+    }
+
+    return undefined
+}
+
+const TAG_BYTES = 8
+const IV_BYTES = 13
+const KEY_BYTES = 32
+
+function aesCcmEncrypt(key: Buffer, iv: Buffer, plaintext: Buffer) {
+    if (key.length != KEY_BYTES || iv.length != IV_BYTES)
+        throw new Error("Invalid key/iv")
+
+    const cipher = crypto.createCipheriv("aes-256-ccm", key, iv, {
+        authTagLength: TAG_BYTES,
+    })
+    const b0 = cipher.update(plaintext)
+    const b1 = cipher.final()
+    const tag = cipher.getAuthTag()
+    return Buffer.concat([b0, b1, tag])
+}
+
+function aesCcmDecrypt(key: Buffer, iv: Buffer, msg: Buffer) {
+    if (
+        key.length != KEY_BYTES ||
+        iv.length != IV_BYTES ||
+        !Buffer.isBuffer(msg)
+    )
+        throw new Error("invalid key, iv or msg")
+
+    if (msg.length < TAG_BYTES) return null
+
+    const decipher = crypto.createDecipheriv("aes-256-ccm", key, iv, {
+        authTagLength: TAG_BYTES,
+    })
+
+    decipher.setAuthTag(msg.slice(msg.length - TAG_BYTES))
+
+    const b0 = decipher.update(msg.slice(0, msg.length - TAG_BYTES))
+    try {
+        decipher.final()
+        return b0
+    } catch {
+        return null
+    }
+}
+
+const app = express()
+app.post(
+    "/api/devs-enc-fetch/:deviceId",
+    bodyParser.raw({ type: "application/x-devs-enc-fetch" }),
+    (req, res) => {
+        const { deviceId } = req.params
+        const pass = getPasswordForDevice(deviceId)
+        if (!pass) {
+            console.log(`No device ${deviceId}`)
+            res.sendStatus(404)
+            return
+        }
+
+        console.log(`Device connected ${deviceId}`)
+
+        const iv = Buffer.alloc(13) // zero IV
+        const salt = req.headers["x-devs-enc-fetch-salt"] + ""
+        const key = Buffer.from(crypto.hkdfSync("sha256", pass, salt, "", 32))
+
+        const body = aesCcmDecrypt(key, iv, req.body as Buffer)
+        if (!body) {
+            console.log(`Can't decrypt`)
+            res.sendStatus(400)
+            return
+        }
+        const obj = JSON.parse(body.toString("utf-8"))
+        console.log("Request body:", obj)
+
+        const rid = obj.$rid
+
+        const respKeyInfo = crypto.randomBytes(15).toString("base64")
+        res.header("x-devs-enc-fetch-info", respKeyInfo)
+        const respKey = Buffer.from(
+            crypto.hkdfSync("sha256", pass, salt, respKeyInfo, 32)
+        )
+
+        // TODO check for duplicate rid!
+
+        const resp = {
+            $rid: rid,
+            response: "Got it!",
+        }
+
+        const rbody = aesCcmEncrypt(
+            respKey,
+            iv,
+            Buffer.from(JSON.stringify(resp), "utf8")
+        )
+        res.end(rbody)
+    }
+)
+
+app.listen(8080)
+```
+
+## Technical description
+
+The `encryptedFetch()` function performs as HTTP request which uses `content-type` of `application/x-devs-enc-fetch`
+and two special headers.
+The `x-devs-enc-fetch-algo` header contains information about the request encryption algorithm
+and can be safely ignored.
+The `x-devs-enc-fetch-salt` contain a string salt value for HMAC key derivation function (HKDF) from RFC 5869.
+
+The `encryptedFetch()` function also requires a password, which should be long-ish
+random string (with about 256-bits of entropy).
+The key for AES encryption is derived using HKDF based on the password and previously
+generated salt; the `info` parameter is set to `""`.
+This key is used for both encryption and authentication of the request.
+
+The body of the request is a JSON object.
+Before sending it out, `encryptedFetch()` extends it with a random request identifier (stored in `$rid` property).
+The JSON object is converted to a buffer and
+encrypted using AES-256-CCM and an 8-byte authentication tag is appended.
+The initialization vector (IV) is all-zero.
+
+This is sent to the server, which decrypts the request accordingly.
+
+:::warning
+
+If applicable, the server should check if a request with a given `$rid` was already handled,
+and if so, reject it.
+Otherwise, someone can replay a client request.
+
+:::
+
+If the server responds with `2xx` code, the response is assumed to be
+a JSON object encrypted using a key derived using HKDF from the password,
+the previously generated salt, and `info` parameter set to the value
+of `x-devs-enc-fetch-info` in the response.
+IV is all zero.
+The response also has the 8-byte authentication tag.
+
+If the response is not `2xx` or if it cannot be authenticated an exception is thrown.
+Otherwise, the JSON object of the response is returned.
+
+## Security
+
+From the device standpoint, if the salt is unique, the device can be sure
+only someone with the password can read the request or generate a response.
+Response cannot be replayed, since the key for it incorporates the salt.
+
+From the server standpoint, a man-in-the-middle attacker can intercept
+a device request and either delay it or send it again at later time.
+Thus, server should check for uniqueness of the `$rid` if this can be a problem.
+The attacker will not be able to deduce anything about the contents of the response
+even if the server doesn't ignore a duplicate request, since the `info` parameter
+send from server is incorporated in the response key and it is random.

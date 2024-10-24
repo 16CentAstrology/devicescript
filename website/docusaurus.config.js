@@ -213,7 +213,7 @@ const config = configure(
                 announcementBar: {
                     id: "support_us",
                     content:
-                        'Technical Preview - Join the <a href="https://github.com/microsoft/devicescript/discussions">discussions</a> to provide feedback.',
+                        'Experimental Project from Microsoft Research - Join the <a href="https://github.com/microsoft/devicescript/discussions">discussions</a> to provide feedback.',
                     backgroundColor: "#fafbfc",
                     textColor: "#091E42",
                     isCloseable: true,
@@ -280,7 +280,7 @@ const config = configure(
                             ],
                         },
                         {
-                            title: "Community",
+                            title: "Info",
                             items: [
                                 {
                                     label: "GitHub",
@@ -290,6 +290,10 @@ const config = configure(
                                     label: "Discussions",
                                     href: "https://github.com/microsoft/devicescript/discussions",
                                 },
+                                {
+                                    label: "Consumer Health Privacy",
+                                    href:"https://go.microsoft.com/fwlink/?linkid=2259814"
+                                }
                             ],
                         },
                     ],
@@ -301,14 +305,6 @@ const config = configure(
             }),
     },
     {
-        appInsights: {
-            instrumentationKey: "06283122-cd76-493c-9641-fbceeeefd9c6",
-        },
-        algolia: {
-            appId: "AL1OJNE8M9",
-            apiKey: "0d31b2119e202cd71b47e914cc567fab",
-            indexName: "devicescript",
-        },
         codeSandbox: {
             defaultTemplate: "devicescript",
             templates: {

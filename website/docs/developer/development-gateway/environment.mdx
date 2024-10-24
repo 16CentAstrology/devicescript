@@ -1,0 +1,50 @@
+---
+sidebar_position: 3
+description: Learn how to configure and manage environment settings using
+  Devicescript Cloud, OpenAPI, and Visual Studio Code extension.
+keywords:
+  - devicescript cloud
+  - environment configuration
+  - OpenAPI
+  - Visual Studio Code extension
+  - environment management
+---
+# Environment
+
+A configuration object pushed from the cloud as an observable. The environment can be configured
+through the gateway OpenAPI or the Visual Studio Code extension.
+
+The environment is cached locally in the settings to handle offline scenarios.
+
+```ts
+import { environment } from "@devicescript/cloud"
+
+// highlight-next-line
+const env = await environment<{ target: number }>()
+```
+
+## value
+
+Reads the current value of the environment.
+
+```ts
+import { environment } from "@devicescript/cloud"
+const env = await environment<{ target: number }>()
+
+// highlight-next-line
+const { target } = await env.read()
+```
+
+## subscribe
+
+Subscribes to updates to the environment values.
+
+```ts
+import { environment } from "@devicescript/cloud"
+const env = await environment<{ target: number }>()
+
+// highlight-next-line
+env.subscribe(async ({ target }) => {
+    console.log(target)
+})
+```

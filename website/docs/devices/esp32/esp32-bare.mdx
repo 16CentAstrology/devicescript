@@ -10,6 +10,19 @@ Bare ESP32 without any default functions for pins.
 ## Features
 
 
+{@import optional ./esp32-bare-features.mdp}
+
+
+{@import optional ./esp32-bare-services.mdp}
+
+
+:::caution
+
+I2C pins are not [configured](/developer/board-configuration).
+
+:::
+
+
 ## Stores
 
 -  [https://www.espressif.com/en/products/socs/esp32](https://www.espressif.com/en/products/socs/esp32)
@@ -38,9 +51,25 @@ Bare ESP32 without any default functions for pins.
 
 
 
-## Firmware update
+## DeviceScript import
+
+
+You must add this import statement to load 
+the pinout configuration for this device.
 
 In [Visual Studio Code](/getting-started/vscode),
+click the **wand** icon on the file menu and 
+select "Espressif ESP32 (bare)".
+
+```ts
+import { pins, board } from "@dsboard/esp32_bare"
+```
+
+{@import optional ./esp32-bare-examples.mdp}
+
+## Firmware update
+
+In Visual Studio Code,
 select **DeviceScript: Flash Firmware...** from the command palette.
         
 Run this [command line](/api/cli) command and follow the instructions.

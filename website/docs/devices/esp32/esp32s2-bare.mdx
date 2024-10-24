@@ -9,6 +9,20 @@ A bare ESP32-S2 board without any pin functions.
 
 ## Features
 
+-  Serial logging on pin P43 at 115200 8N1
+
+{@import optional ./esp32s2-bare-features.mdp}
+
+
+{@import optional ./esp32s2-bare-services.mdp}
+
+
+:::caution
+
+I2C pins are not [configured](/developer/board-configuration).
+
+:::
+
 
 ## Stores
 
@@ -43,6 +57,7 @@ A bare ESP32-S2 board without any pin functions.
 | **P40** |  GPIO40 |  debug,  io |
 | **P41** |  GPIO41 |  debug,  io |
 | **P42** |  GPIO42 |  debug,  io |
+| **P43** |  GPIO43 |  log.pinTX,  io |
 | **P44** |  GPIO44 |  io |
 | **P45** |  GPIO45 |  boot,  io |
 | **P46** |  GPIO46 |  boot,  input |
@@ -54,9 +69,25 @@ A bare ESP32-S2 board without any pin functions.
 
 
 
-## Firmware update
+## DeviceScript import
+
+
+You must add this import statement to load 
+the pinout configuration for this device.
 
 In [Visual Studio Code](/getting-started/vscode),
+click the **wand** icon on the file menu and 
+select "Espressif ESP32-S2 (bare)".
+
+```ts
+import { pins, board } from "@dsboard/esp32s2_bare"
+```
+
+{@import optional ./esp32s2-bare-examples.mdp}
+
+## Firmware update
+
+In Visual Studio Code,
 select **DeviceScript: Flash Firmware...** from the command palette.
         
 Run this [command line](/api/cli) command and follow the instructions.
@@ -79,8 +110,10 @@ devicescript flash --board esp32s2_bare
     "$description": "A bare ESP32-S2 board without any pin functions.",
     "archId": "esp32s2",
     "url": "https://www.espressif.com/en/products/socs/esp32-s2",
+    "log": {
+        "pinTX": "P43"
+    },
     "pins": {
-        "@P43": 43,
         "P0": 0,
         "P1": 1,
         "P10": 10,
@@ -106,6 +139,7 @@ devicescript flash --board esp32s2_bare
         "P40": 40,
         "P41": 41,
         "P42": 42,
+        "P43": 43,
         "P44": 44,
         "P45": 45,
         "P46": 46,
@@ -114,7 +148,6 @@ devicescript flash --board esp32s2_bare
         "P7": 7,
         "P8": 8,
         "P9": 9
-    },
-    "uartLog": true
+    }
 }
 ```

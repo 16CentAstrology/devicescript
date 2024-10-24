@@ -5,11 +5,11 @@ sidebar_position: 0
 # Command Line Interface
 
 The DeviceScript command line (CLI) allows to compile and debug programs from your favorite IDE.
-The CLI also also usable within containers (Docker, GitHub Codespaces, CodeSandbox, ...).
+The CLI is also usable within containers (Docker, GitHub Codespaces, CodeSandbox, ...).
 
 ## Setup
 
--   install [Node.JS 18+](https://nodejs.org/en/download/)
+-   install [Node.JS 16+](https://nodejs.org/en/download/)
 -   install the CLI
 
 ```bash npm2yarn
@@ -59,7 +59,12 @@ devs init --force
 
 ### --no-install
 
-Do not run `npm` or `yarn ` install after dropping the files.
+Do not run `npm` or `yarn` install after dropping the files.
+
+### --board board-id
+
+Specify the device identifier to use for the project.
+The generate will patch `./src/main.ts` and insert the board import statement.
 
 ## devs add ...
 
@@ -100,7 +105,7 @@ devs add sim
 
 ### add npm
 
-Prepre the project to be published to [npm.js](https://npmjs.com/) as a library.
+Prepare the project to be published to [npm.js](https://npmjs.com/) as a library.
 
 ```bash
 devs add npm
@@ -143,7 +148,7 @@ To automatically rebuild your program based on file changes,
 add the file name.
 
 ```bash
-devs devtools main.ts
+devs devtools src/main.ts
 ```
 
 When the build is run in watch mode, it also opens a developer tool web server that allows
@@ -164,12 +169,43 @@ stateDiagram-v2
     browser --> dev: WebSerial, WebUsb, ...
 ```
 
-#### --internet
+### --internet
 
 To access the developer tools outside localhost, add `--internet`
 
 ```bash
 devs devtools --internet
+```
+
+### --usb, --serial, --spi
+
+These flags tell the CLI to open native transports to USB, Serial or SPI devices. Each of these flags requires to install separate packages. These packages are not installed by default, as they typically have native dependencies and may not successfully install on all environments.
+
+#### --usb
+
+Uses [usb package](https://www.npmjs.com/package/usb) to communicate with USB devices.
+
+```bash npm2yarn
+npm install usb
+devs devtools --usb
+```
+
+#### --serial
+
+Uses [serialport package](https://www.npmjs.com/package/serialport) to communicate with USB devices.
+
+```bash npm2yarn
+npm install serialport
+devs devtools --serial
+```
+
+#### --spi
+
+On Raspberry Pi, uses [node-rpio](https://www.npmjs.com/package/rpio) and [spi-dev](https://www.npmjs.com/package/spi-dev).
+
+```bash npm2yarn
+npm install rpio spi-dev
+devs devtools --spi
 ```
 
 ## devs flash
@@ -179,3 +215,8 @@ pages to support various MCU architectures.
 
 -   [ESP32](/devices/esp32/)
 -   [RP2040](/devices/rp2040/)
+
+## devs bundle
+
+Bundle firmware, DeviceScript program, and settings into one image.
+[Learn more](/developer/bundle)

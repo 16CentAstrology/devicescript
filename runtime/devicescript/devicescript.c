@@ -8,7 +8,10 @@ STATIC_ASSERT(sizeof(devs_img_header_t) ==
 STATIC_ASSERT(sizeof(devs_function_desc_t) == DEVS_FUNCTION_HEADER_SIZE);
 
 static void setup_ctx(devs_ctx_t *ctx, const uint8_t *img) {
+    static uint32_t ctx_seq_no;
+
     ctx->img.data = img;
+    ctx->ctx_seq_no = ++ctx_seq_no;
 
     ctx->gc = devs_gc_create();
 
@@ -27,9 +30,12 @@ static void setup_ctx(devs_ctx_t *ctx, const uint8_t *img) {
     devs_jd_reset_packet(ctx);
 
     devs_jd_init_roles(ctx);
+    devs_gpio_init_dcfg(ctx);
 
     if (ctx->error_code)
         return;
+
+    DEVS_CHECK_CTX_FREE(ctx);
 
     // reference the "main" function (first function)
     ctx->the_stack[0] = devs_value_from_handle(DEVS_HANDLE_TYPE_STATIC_FUNCTION, 0);

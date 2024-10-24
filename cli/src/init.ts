@@ -1,4 +1,4 @@
-import { debug, fatal, GENDIR, LIBDIR, log } from "./command"
+import { debug, fatal, GENDIR, LIBDIR, log, verboseLog } from "./command"
 import { basename, dirname, join, resolve } from "node:path"
 import {
     pathExistsSync,
@@ -11,7 +11,7 @@ import {
     existsSync,
 } from "fs-extra"
 import { build } from "./build"
-import { spawnSync, execSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { assert, clone, randomUInt } from "jacdac-ts"
 import { addReqHandler } from "./sidedata"
 import type {
@@ -21,6 +21,8 @@ import type {
     SideAddNpmResp,
     SideAddServiceReq,
     SideAddServiceResp,
+    SideAddSettingsReq,
+    SideAddSettingsResp,
     SideAddSimReq,
     SideAddSimResp,
     SideAddTestReq,
@@ -28,6 +30,9 @@ import type {
 } from "./sideprotocol"
 import { addBoard } from "./addboard"
 import { readJSON5Sync } from "./jsonc"
+import { MARKETPLACE_EXTENSION_ID } from "@devicescript/interop"
+import { TSDOC_TAGS } from "@devicescript/compiler"
+import { execCmd } from "./exec"
 
 const MAIN = "src/main.ts"
 const GITIGNORE = ".gitignore"
@@ -59,14 +64,60 @@ const npmFiles: FileSet = {
     "package.json": {
         [IS_PATCH]: true,
         main: "./src/index.ts",
+        version: "0.0.0",
         license: "MIT",
         devicescript: {
             library: true,
         },
         files: ["src/*.ts", "devsconfig.json"],
         keywords: ["devicescript"],
+        scripts: {
+            "build:docs":
+                "npx typedoc ./src/index.ts --tsconfig ./src/tsconfig.json",
+        },
     },
     "src/index.ts": `${IMPORT_PREFIX}\n\n`,
+    "src/tsdoc.json": {
+        $schema:
+            "https://developer.microsoft.com/en-us/json-schemas/tsdoc/v0/tsdoc.schema.json",
+        extends: ["typedoc/tsdoc.json"],
+        noStandardTags: false,
+        tagDefinitions: TSDOC_TAGS.map(tag => ({
+            tagName: `@${tag}`,
+            syntaxKind: "modifier",
+        })),
+    },
+    ".github/workflows/build.yml": `name: Build
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions/setup-node@v3
+              with:
+                  node-version: lts/*
+            - run: npm ci
+            - run: npm run build
+            - run: npm test
+`,
+}
+
+const settingsFiles: FileSet = {
+    ".env.defaults": `# Store common settings here.
+# You can commit this file to source control, make sure there are no secrets.
+
+`,
+    ".env.local": `# Store your secrets here. Overrides values in .env
+# Do not commit this file to source control
+
+`,
 }
 
 const simFiles: FileSet = {
@@ -103,10 +154,10 @@ const simFiles: FileSet = {
         scripts: {
             [FORCE]: true,
             "build:sim": "cd sim && tsc --outDir ../.devicescript/sim",
-            build: "yarn build:devicescript && yarn build:sim",
+            build: "npm run build:devicescript && npm run build:sim",
             "watch:sim":
                 "cd sim && nodemon --watch './**' --ext 'ts,json' --exec 'ts-node ./app.ts --project ./tsconfig.json'",
-            watch: "yarn watch:devicescript & yarn watch:sim",
+            watch: "npm run watch:devicescript & npm run watch:sim",
         },
     },
     "sim/runtime.ts": `import "websocket-polyfill"
@@ -130,14 +181,22 @@ export const bus = createWebSocketBus({
 `,
     "sim/README.md": `# Simulators (node.js)
 
-This folder contains a Node.JS/TypeScript application that will be executed side-by-side with
+This folder contains a Node.JS/TypeScript application that can be executed side-by-side with
 the DeviceScript debugger and simulators. The application uses the [Jacdac TypeScript package](https://microsoft.github.io/jacdac-docs/clients/javascript/)
 to communicate with DeviceScript.
 
-The default entry point file is \`app.ts\`, which uses the Jacdac bus from \`runtime.ts\` to communicate
+The default entry point file is \`./sim/app.ts\`, which uses the Jacdac bus from \`./sim/runtime.ts\` to communicate
 with the rest of the DeviceScript execution.
 
-Feel free to modify to your needs and taste.
+## Editing and using the sim
+
+-  open a new terminal
+-  launch the simulator in watch mode (restarts on every change)
+
+    npm run watch:sim
+
+-  edit the DeviceScript part of the application as usual. The sim process will automatically connect
+to the VS Code extension
 `,
     "sim/app.ts": `import { bus } from "./runtime"\n\n`,
     "sim/tsconfig.json": {
@@ -158,6 +217,13 @@ Feel free to modify to your needs and taste.
 }
 
 const optionalFiles: FileSet = {
+    ".devcontainer/devcontainer.json": {
+        image: "mcr.microsoft.com/devcontainers/javascript-node:20",
+        features: {
+            "ghcr.io/devcontainers/features/node:1": {},
+            "ghcr.io/devcontainers/features/github-cli:1": {},
+        },
+    },
     "src/tsconfig.json": {
         compilerOptions: {
             moduleResolution: "node",
@@ -175,27 +241,20 @@ const optionalFiles: FileSet = {
             isolatedModules: true,
             noImplicitAny: true,
             moduleDetection: "force",
+            forceConsistentCasingInFileNames: true,
             types: [],
+            jsx: "preserve",
         },
-        include: ["**/*.ts", `../${LIBDIR}/core/src/*.ts`],
+        include: ["**/*.ts", "**/*.tsx", `../${LIBDIR}/core/src/*.ts`],
     },
     ".prettierrc": {
         arrowParens: "avoid",
+        trailingComma: "es5",
         semi: false,
         tabWidth: 4,
     },
     ".vscode/extensions.json": {
-        recommendations: [
-            "devicescript.devicescript-vscode",
-            "esbenp.prettier-vscode",
-            "ms-toolsai.jupyter",
-            "ms-toolsai.jupyter-renderers",
-            "ms-python.python",
-            "ms-python.vscode-pylance",
-            "mechatroner.rainbow-csv",
-            "dotenv.dotenv-vscode",
-            "rpdswtk.vsmqtt",
-        ],
+        recommendations: [MARKETPLACE_EXTENSION_ID, "esbenp.prettier-vscode", "genaiscript.genaiscript-vscode"],
     },
     ".vscode/launch.json": {
         version: "0.2.0",
@@ -210,63 +269,71 @@ const optionalFiles: FileSet = {
             },
         ],
     },
+    ".yarnrc.yml": `
+# Force Yarn v2+ to use node_modules
+nodeLinker: node-modules`,
     "devsconfig.json": {},
     "package.json": {
         version: "0.0.0",
-        private: "Please use 'devs add npm' to make this a publishable package",
+        private:
+            "Please use 'yarn devs add npm' to make this a publishable package",
         dependencies: {},
         devDependencies: {
             "@devicescript/cli": "latest",
         },
         scripts: {
             setup: "devicescript build --quiet", // generates node_modules/@devicescript/* files
-            postinstall: "devicescript build",
             "build:devicescript": "devicescript build src/main.ts",
-            build: "yarn build:devicescript",
+            postinstall: "npm run setup",
+            build: "npm run build:devicescript",
             "watch:devicescript": `devicescript devtools ${MAIN}`,
-            watch: "yarn watch:devicescript",
+            watch: "npm run watch:devicescript",
             "test:devicescript":
                 "devicescript run src/main.ts --test --test-self-exit",
-            test: "yarn test:devicescript",
-            start: "yarn watch",
+            test: "npm run test:devicescript",
+            start: "npm run watch",
         },
     },
     [MAIN]: `${IMPORT_PREFIX}
 
-setInterval(() => {
+setInterval(async () => {
     console.log(":)")
 }, 1000)\n`,
     "README.md": `# - project name -
 
 This project uses [DeviceScript](https://microsoft.github.io/devicescript/).
 
-## Project structures
+`,
+    "CONTRIBUTING.md": `
+# Contributing
 
-\`\`\`
-.devicescript      reserved folder for devicescript generated files
-src/main.ts        default DeviceScript entry point
-...
-\`\`\`
+This project uses [DeviceScript](https://microsoft.github.io/devicescript/)
+which provides a TypeScript experience for micro-controllers. 
+
+The best development experience is done through Visual Studio Cocde and the DeviceScript extension;
+but a command line tool is also available.
+
+Container development (Codespaces, CodeSandbox, ...)
+is supported but connection to hardware (through Serial or USB) is not available.
+Simulators and compilers will work.
 
 
-## Local/container development
+## Local development
 
--  install node.js 18+
+-  install [Node.js LTS](https://nodejs.org/en/download) using [nvm](https://github.com/nvm-sh/nvm)
 
 \`\`\`bash
-nvm install 18
-nvm use 18
+nvm install --lts
+nvm use --lts
 \`\`\`
 
--  install dependencies
+-  install DeviceScript compiler and tools
 
 \`\`\`bash
-yarn install
+npm install
 \`\`\`
 
-### Using Visual Studio Code
-
-- open the project folder in code
+- open the project folder in [Visual Studio Code](https://code.visualstudio.com/)
 
 \`\`\`bash
 code .
@@ -274,28 +341,17 @@ code .
 
 - install the [DeviceScript extension](https://microsoft.github.io/devicescript/getting-started/vscode)
 
-- start debugging!
-
-### Using the command line
-
-- start the watch build and developer tools server
-
-\`\`\`bash
-yarn watch
-\`\`\`
-
--  navigate to devtools page (see terminal output) 
-to use the simulators or deploy to hardware.
-
--  open \`src/main.ts\` in your favorite TypeScript IDE and start editing.
+- open \`main.ts\` and click on the **play** icon to start the simulator
 
 `,
 }
 
 export interface InitOptions {
+    yarn?: boolean
     force?: boolean
     spaces?: number
     install?: boolean
+    board?: string
 }
 
 function patchJSON(fn: string, data: any) {
@@ -306,7 +362,7 @@ function patchJSON(fn: string, data: any) {
         const force = !!src[FORCE]
         for (const k of Object.keys(src)) {
             if (k == IS_PATCH || k == FORCE) continue
-            if (trg[k] === undefined || force) trg[k] = src[k]
+            if (trg[k] === undefined || trg[k] === "" || force) trg[k] = src[k]
             else if (
                 Array.isArray(src[k]) &&
                 Array.isArray(trg[k]) &&
@@ -353,11 +409,15 @@ function writeFiles(dir: string, options: InitOptions, files: FileSet) {
     return cwd
 }
 
+function isYarn(cwd: string, options: InitOptions) {
+    const yarnlock = pathExistsSync(join(cwd, "yarn.lock"))
+    return yarnlock || options.yarn
+}
+
 async function runInstall(cwd: string, options: InitOptions) {
     if (options.install) {
-        const npm = pathExistsSync(join(cwd, "package-lock.json"))
-        const cmd = npm ? "npm" : "yarn"
-        log(`install dependencies...`)
+        const cmd = isYarn(cwd, options) ? "yarn" : "npm"
+        log(`install dependencies using ${cmd}...`)
         spawnSync(cmd, ["install"], {
             shell: true,
             stdio: "inherit",
@@ -380,12 +440,30 @@ function finishAdd(message: string, files: string[] = []) {
 }
 
 export async function init(dir: string | undefined, options: InitOptions) {
-    log(`Configuring DeviceScript project`)
+    log(`Configuring DeviceScript project...`)
 
-    const cwd = writeFiles(dir, options, optionalFiles)
+    const files = { ...optionalFiles }
+    if (isYarn(".", options)) patchYarnFiles(files)
 
-    // .gitignore
-    const gids = ["node_modules", GENDIR]
+    // write template files
+    const cwd = writeFiles(dir, options, files)
+
+    // ok, soft patch applied, now we apply more stuff that always has to be set
+    // in case the project already had a package.json
+    const pkg = readJSON5Sync("package.json") as PackageManifest
+
+    // name needed in worspace for install to work
+    if (!pkg.name)
+        pkg.name = dir && dir !== "./" ? dir : basename(process.cwd())
+    if (pkg.name === "./") pkg.name = "devicescript-demo"
+
+    // ensure cli is added
+    addCliDependency(pkg)
+    // write down
+    writePackage(pkg, options.spaces)
+
+    // patch .gitignore
+    const gids = ["node_modules", GENDIR, ".env.local", ".env.*.local"]
     const gitignoren = join(cwd, GITIGNORE)
     if (!pathExistsSync(gitignoren)) {
         debug(`write ${gitignoren}`)
@@ -411,11 +489,24 @@ export async function init(dir: string | undefined, options: InitOptions) {
 
     await runInstall(cwd, options)
 
+    // patch main.ts with board info
+    if (options.board) {
+        const mainFn = join(cwd, MAIN)
+        if (pathExistsSync(mainFn)) {
+            const main = readFileSync(mainFn, { encoding: "utf8" })
+            if (!main.includes(`from "@dsboard/${options.board}"`)) {
+                const importStmt = `import { pins, board } from "@dsboard/${options.board}"\n`
+                const newMain = importStmt + main
+                writeFileSync(mainFn, newMain, { encoding: "utf8" })
+            }
+        }
+    }
+
     // build to get node_modules/@devicescript/* files etc
     await build(MAIN, {})
 
     return finishAdd(
-        `Your DeviceScript project is initialized. Try 'devs add' to see what can be added.\n` +
+        `Your DeviceScript project is initialized.\n` +
             `To get more help, https://microsoft.github.io/devicescript/getting-started/`,
         ["package.json", MAIN]
     )
@@ -477,46 +568,134 @@ A measure of ${name}.
 
 export interface AddNpmOptions extends InitOptions {
     license?: string
+    name?: string
 }
 
-function execCmd(cmd: string) {
-    try {
-        return execSync(cmd, { encoding: "utf-8" }).trim()
-    } catch {
-        return ""
+export interface AddSettingsOptions extends InitOptions {}
+
+export async function addSettings(options: AddSettingsOptions) {
+    const files = clone(settingsFiles)
+    const cwd = writeFiles(".", options, files)
+    return finishAdd(
+        `Prepared .env.* files, please add device settings in those files.`,
+        Object.keys(files)
+    )
+}
+
+// enforce nicer order on package.json fields
+function sortPkgJson(pkg: any) {
+    const jsonFields: string[] = [
+        "name",
+        "description",
+        "version",
+        "author",
+        "license",
+        "main",
+        "devicescript",
+    ]
+    const p2: any = {}
+    for (const f of jsonFields.concat(Object.keys(pkg))) {
+        p2[f] = pkg[f]
     }
+    return p2
+}
+
+function patchYarnCommands(content: string) {
+    if (!content) return content
+    return content
+        .replace("npm ci", "yarn install --frozen-lockfile")
+        .replace("npm install", "yarn install")
+        .replace("npm run build", "yarn build")
+        .replace("npm run watch", "yarn watch")
+        .replace("npm test", "yarn test")
+}
+
+function patchYarnFiles(files: FileSet) {
+    ;[".github/workflows/build.yml", "README.md", "CONTRIBUTING.md"]
+        .filter(fn => !!files[fn])
+        .forEach(fn => {
+            files[fn] = patchYarnCommands(files[fn] as string)
+        })
+}
+
+interface PackageManifest {
+    author: string
+    devDependencies?: Record<string, string>
+    dependencies?: Record<string, string>
+    repository?: {
+        url: string
+        type: "git"
+    }
+    name?: string
+    private?: boolean
+    license?: string
+}
+
+// ensure @devicescript/cli in in package json
+function addCliDependency(pkg: PackageManifest) {
+    // ensure @devicescript/cli in in package json
+    if (!pkg.devDependencies) pkg.devDependencies = {}
+    pkg.devDependencies["@devicescript/cli"] = "latest"
+}
+
+function writePackage(pkg: PackageManifest, spaces?: number) {
+    writeJSONSync("./package.json", sortPkgJson(pkg), {
+        spaces: spaces ?? 4,
+    })
 }
 
 export async function addNpm(options: AddNpmOptions) {
     const files = clone(npmFiles)
-    const pkg = files["package.json"] as any
-    pkg.license = options.license ?? "MIT"
-    if (!pkg.author) {
-        let uname = execCmd("git config --get user.name")
-        if (uname) {
-            uname += " <" + execCmd("git config --get user.email") + ">"
-            pkg.author = uname
-        }
+    let pkg = files["package.json"] as PackageManifest
+
+    // note that these operations are performed on the *patch* not on package.json
+    // these fields apply *only* if given field is missing or set to ""
+
+    let uname = execCmd("git config --get user.name")
+    if (uname) {
+        debug(`set author to ${uname}`)
+        pkg.author = uname
     }
 
-    if (!pkg.repository && pathExistsSync(".git")) {
-        const url = execCmd("git remote get-url origin")
+    let url = ""
+
+    if (pathExistsSync(".git")) {
+        url = execCmd("git remote get-url origin")
         if (url)
             pkg.repository = {
                 type: "git",
                 url: url,
             }
     }
-    if (!pkg.version) pkg.version = "0.0.0"
-    if (!pkg.name) pkg.name = `devicescript-${basename(__dirname)}`
-    delete pkg.private
+
+    pkg.name = url ? url.replace(/.*\//, "") : basename(resolve("."))
+
     let lst = await readdir("src")
     lst = lst.filter(f => !f.startsWith("main") && f.endsWith(".ts"))
     for (const fn of lst) {
         files["src/index.ts"] += `export * from "./${fn.slice(0, -3)}"\n`
     }
 
+    if (isYarn(".", options)) patchYarnFiles(files)
+
     const cwd = writeFiles(".", options, files)
+
+    // ok, soft patch applied, now we apply more stuff that always has to be set
+    pkg = readJSON5Sync("package.json") as PackageManifest
+
+    // ensure cli is added
+    addCliDependency(pkg)
+
+    // npm is never private:
+    delete pkg.private
+
+    // if user specified, override
+    if (options.license) pkg.license = options.license
+    if (options.name) pkg.name = options.name
+
+    // save
+    writePackage(pkg, options.spaces)
+
     await runInstall(cwd, options)
 
     return finishAdd(`Prepared package.json for publishing, please review.`, [
@@ -555,6 +734,9 @@ export function initAddCmds() {
     )
     addReqHandler<SideAddSimReq, SideAddSimResp>("addSim", d => addSim(d.data))
     addReqHandler<SideAddNpmReq, SideAddNpmResp>("addNpm", d => addNpm(d.data))
+    addReqHandler<SideAddSettingsReq, SideAddSettingsResp>("addSettings", d =>
+        addSettings(d.data)
+    )
     addReqHandler<SideAddTestReq, SideAddTestResp>("addTest", d =>
         addTest(d.data)
     )

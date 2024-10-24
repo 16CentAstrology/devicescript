@@ -1,7 +1,14 @@
 ---
 sidebar_position: 9
+description: Learn how to use buffers for dynamic allocation, memory
+  conservation, and creating arrays with fixed upper limits.
+keywords:
+  - buffers
+  - markdown
+  - dynamic allocation
+  - memory conservation
+  - arrays
 ---
-
 # Buffers
 
 Buffers can be dynamically allocated, read and written.
@@ -23,6 +30,15 @@ const z = mybuf.getAt(3, "u22.10")
 // Buffer in flash!
 const data = hex`010203040506070809`
 console.log(data)
+```
+
+Comments and whitespace are allowed in `hex` literals:
+
+```ts
+const commentedData = hex`
+01 02 03 // first three numbers
+ff aa    // two more bytes
+`
 ```
 
 ## packet

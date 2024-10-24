@@ -25,20 +25,11 @@ export async function checkRuntimeVersion(minVersion: string, srv: JDService) {
     if (shouldIgnoreRuntimeVersion()) return true
 
     const flashCommand = "Upgrade Firmware..."
+    const depCommand = "Upgrade Dependencies..."
     const version = await readRuntimeVersion(srv)
     console.debug(`deploy: version min ${minVersion}, device ${version}`)
     if (version === undefined) {
-        showErrorMessage(
-            "build.firmware.noversion",
-            `Deploy cancelled. Your device firmware does not have a runtime version.`,
-            flashCommand
-        ).then(cmd => {
-            if (cmd === flashCommand)
-                vscode.commands.executeCommand(
-                    "extension.devicescript.device.flash",
-                    srv.device
-                )
-        })
+        // might be in a broken state that prevents querying the runtime
         return false
     }
 
@@ -64,8 +55,14 @@ export async function checkRuntimeVersion(minVersion: string, srv: JDService) {
     } else if (vcurr.major > vmin.major) {
         showErrorMessage(
             "deploy.firmware.ahead",
-            `Deploy cancelled. Your device firmware (${version}) is ahead of the device script tools (${minVersion}). Update your dependencies.`
-        )
+            `Deploy cancelled. Your device firmware (${version}) is ahead of the device script tools (${minVersion}). Upgrade your dependencies.`,
+            depCommand
+        ).then(cmd => {
+            if (cmd === depCommand)
+                vscode.commands.executeCommand(
+                    "extension.devicescript.projet.upgrade"
+                )
+        })
         return false
     }
     return true

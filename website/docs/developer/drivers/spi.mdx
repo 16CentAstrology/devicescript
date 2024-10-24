@@ -1,0 +1,33 @@
+---
+title: SPI
+sidebar_position: 14
+---
+
+# SPI
+
+SPI [builtin package](/developer/packages) that exposes functions to read, write, transfer buffers over SPI.
+
+```ts
+import { spi } from "@devicescript/spi"
+
+await spi.configure({})
+
+// write a few bytes
+await spi.write(hex`abcd`)
+
+// read 8 bytes
+const resp = await spi.read(8)
+
+// write and read a buffer
+const resp2 = await spi.transfer(hex`abcd`)
+```
+
+:::caution
+
+SPI is not yet implemented on [RP2040](/devices/).
+
+:::
+
+## See also
+
+-   [API reference](/api/spi/)

@@ -8,11 +8,20 @@ import StaticVideo from "@site/src/components/StaticVideo"
 
 The [Visual Studio Code](https://code.visualstudio.com/) extension provides the best developer experience for DeviceScript.
 
--   **install the [DeviceScript extension](https://marketplace.visualstudio.com/items?itemName=devicescript.devicescript-vscode)**
+-   **find the latest release at [https://github.com/microsoft/devicescript/releases](https://github.com/microsoft/devicescript/releases?expanded=true)**
+-   download `devicescript.vsix` from **Assets**
+-   install the .vsix file in code
+
+:::tip
+
+The DeviceScript extension is not available from the Marketplace anymore.
+
+:::
+
 
 You will also need
 
--   **[Node.JS 18+](https://nodejs.org/en/download/)**
+-   **[Node.JS 20+](https://nodejs.org/en/download/)**
 -   **[Visual Studio Code](https://code.visualstudio.com/)**
 
 <StaticVideo name="blinky" />
@@ -20,13 +29,14 @@ You will also need
 ## Features
 
 -   Build and watch using DeviceScript compiler, deploy to simulator or hardware
+-   [Board configuration](/developer/board-configuration) for hardware pins, I2S, SPI configurations
 -   [Debugger](./vscode/debugging) with breakpoints, stack traces, exceptions, stepping
 -   [Simulator](./vscode/simulation) for DeviceScript and sensors/actuators
 -   Connection to native DeviceScript device
 -   Device, services, register [Explorer view](./vscode/user-interface)
 -   Register and Event watch
 
-### (Optional) Manual installation from the GitHub releases
+### Manual installation from the GitHub releases
 
 -   **find the latest release at [https://github.com/microsoft/devicescript/releases](https://github.com/microsoft/devicescript/releases?expanded=true)**
 -   download `devicescript.vsix` from **Assets**
@@ -38,7 +48,7 @@ or the **Extensions: Install from VSIX** command in the Command Palette, point t
 
 ## Creating a new project
 
--   install [Node.JS 18+](https://nodejs.org/en/download/)
+-   install [Node.JS 16+](https://nodejs.org/en/download/)
 -   From the Command palette, type **DeviceScript: Create New Project...** and follow the prompts.
 
 The new project should be ready to go.
@@ -46,3 +56,9 @@ The new project should be ready to go.
 ## DeviceScript basics
 
 Navigate to the [Developer section](/developer) to learn the basics of the language.
+
+:::tip
+
+To report an issue, open the command palette and run **DeviceScript: Report Issue...\***.
+
+:::

@@ -15,10 +15,11 @@
         "isolatedModules": true,
         "noImplicitAny": true,
         "moduleDetection": "force",
+        "forceConsistentCasingInFileNames": true,
         "types": []
     },
     "include": [
         "**/*.ts",
-        "../node_modules/@devicescript/core/src/*.d.ts"
+        "../node_modules/@devicescript/core/src/*.ts"
     ]
 }
